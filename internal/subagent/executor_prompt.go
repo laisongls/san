@@ -143,6 +143,7 @@ func formatTaskToolProgress(toolName string, params map[string]any) string {
 
 func formatAgentProgress(params map[string]any) string {
 	agentType, _ := params["subagent_type"].(string)
+	mode, _ := params["mode"].(string)
 	desc, _ := params["description"].(string)
 	if desc == "" {
 		desc, _ = params["prompt"].(string)
@@ -152,12 +153,9 @@ func formatAgentProgress(params map[string]any) string {
 	}
 
 	if agentType == "" {
-		if desc == "" {
-			return "Agent"
-		}
-		return fmt.Sprintf("Agent: %s", desc)
+		agentType = "general-purpose"
 	}
-	agentType = displayAgentName(agentType)
+	agentType = displayAgentName(agentType, PermissionMode(mode))
 	if desc == "" {
 		return fmt.Sprintf("Agent - %s", agentType)
 	}
@@ -168,14 +166,67 @@ func displayNameFor(config *AgentConfig, req AgentRequest) string {
 	if req.Name != "" {
 		return req.Name
 	}
-	return displayAgentName(config.Name)
+	return displayAgentName(config.Name, requestPermissionMode(config, req))
 }
 
-func displayAgentName(name string) string {
-	if strings.EqualFold(name, "general-purpose") {
-		return "General"
+func requestPermissionMode(config *AgentConfig, req AgentRequest) PermissionMode {
+	if req.Mode != "" {
+		return PermissionMode(req.Mode)
 	}
-	return name
+	return config.PermissionMode
+}
+
+func displayAgentName(name string, mode PermissionMode) string {
+	if isGenericAgentName(name) {
+		switch mode {
+		case PermissionExplore:
+			return "Explorer"
+		case PermissionEdit:
+			return "Editor"
+		}
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "explore", "explorer":
+			return "Explorer"
+		case "edit", "editor":
+			return "Editor"
+		default:
+			return "General"
+		}
+	}
+	return shortAgentName(name)
+}
+
+func isGenericAgentName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "agent", "general", "general-purpose", "explore", "explorer", "edit", "editor":
+		return true
+	default:
+		return false
+	}
+}
+
+func shortAgentName(name string) string {
+	words := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' '
+	})
+	kept := make([]string, 0, 2)
+	for _, word := range words {
+		word = strings.ToLower(strings.TrimSpace(word))
+		if word == "" || word == "current" || word == "change" || word == "changes" {
+			continue
+		}
+		kept = append(kept, word)
+		if len(kept) == 2 {
+			break
+		}
+	}
+	if len(kept) == 0 {
+		return "Agent"
+	}
+	for i, word := range kept {
+		kept[i] = strings.ToUpper(word[:1]) + word[1:]
+	}
+	return strings.Join(kept, " ")
 }
 
 func displayPermissionMode(mode PermissionMode) string {

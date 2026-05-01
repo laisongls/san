@@ -44,8 +44,8 @@ func TestAgent_GeneralExploreMode(t *testing.T) {
 	if !result.Success {
 		t.Errorf("expected success, got error: %s", result.Error)
 	}
-	if result.AgentName != "General" {
-		t.Errorf("expected agent name 'General', got %q", result.AgentName)
+	if result.AgentName != "Explorer" {
+		t.Errorf("expected agent name 'Explorer', got %q", result.AgentName)
 	}
 	if result.Content != "Explored the codebase" {
 		t.Errorf("unexpected content: %q", result.Content)
@@ -314,6 +314,7 @@ func TestAgent_OnProgressReceivesToolUpdates(t *testing.T) {
 		Responses: []llm.CompletionResponse{
 			{
 				StopReason: "tool_use",
+				Usage:      llm.Usage{InputTokens: 10, OutputTokens: 3},
 				ToolCalls: []core.ToolCall{
 					{
 						ID:    "tc1",
@@ -325,6 +326,7 @@ func TestAgent_OnProgressReceivesToolUpdates(t *testing.T) {
 			{
 				Content:    "Read complete",
 				StopReason: "end_turn",
+				Usage:      llm.Usage{InputTokens: 20, OutputTokens: 5},
 			},
 		},
 	}
@@ -346,15 +348,18 @@ func TestAgent_OnProgressReceivesToolUpdates(t *testing.T) {
 	if !result.Success {
 		t.Fatalf("expected success, got error: %s", result.Error)
 	}
-	expectedProgress := []string{
+	for _, want := range []string{
+		"Model: fake-model",
 		"Mode: Explore · max 100 turns",
 		"Thinking...",
 		"Read(README.md)",
-	}
-	if !slices.Equal(progress, expectedProgress) {
-		t.Fatalf("unexpected progress callback values: %#v", progress)
-	}
-	if !slices.Equal(result.Progress, expectedProgress) {
-		t.Fatalf("unexpected result progress values: %#v", result.Progress)
+		"Usage: input=30 output=8",
+	} {
+		if !slices.Contains(progress, want) {
+			t.Fatalf("progress callback values missing %q: %#v", want, progress)
+		}
+		if !slices.Contains(result.Progress, want) {
+			t.Fatalf("result progress values missing %q: %#v", want, result.Progress)
+		}
 	}
 }

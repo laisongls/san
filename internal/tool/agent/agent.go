@@ -69,8 +69,11 @@ func (t *AgentTool) PreparePermission(ctx context.Context, params map[string]any
 		return nil, fmt.Errorf("unknown agent type: %s", agentType)
 	}
 
-	// Determine effective model (priority: request > parent > fallback)
+	// Determine effective model for permission display.
 	effectiveModel := requestModel
+	if effectiveModel == "" && config.Model != "" && config.Model != "inherit" {
+		effectiveModel = config.Model
+	}
 	if effectiveModel == "" {
 		effectiveModel = t.executor.GetParentModelID()
 	}

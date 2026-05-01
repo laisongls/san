@@ -30,6 +30,12 @@ func Update(rt Runtime, m *Model, msg tea.Msg) (tea.Cmd, bool) {
 	case kit.TokenLimitResultMsg:
 		return rt.HandleTokenLimitResult(msg), true
 	case ProgressUpdateMsg:
+		if msg.Index < 0 && msg.ToolCallID != "" {
+			msg.Index = m.Tool.IndexOf(msg.ToolCallID)
+		}
+		if msg.Index < 0 {
+			return m.HandleProgressTick(rt.HasRunningTasks()), true
+		}
 		return m.HandleProgress(msg), true
 	case ProgressCheckTickMsg:
 		return m.HandleProgressTick(rt.HasRunningTasks()), true

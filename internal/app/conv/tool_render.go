@@ -543,27 +543,27 @@ func splitByProcessCount(body string, processCount int) (process, response strin
 }
 
 func formatAgentDefinition(input string, width int) string {
-	var params map[string]any
-	if err := json.Unmarshal([]byte(input), &params); err != nil {
+	agent := parseAgentInput(input)
+	if !agent.Valid {
 		return ""
 	}
 
 	var sb strings.Builder
 	meta := make([]string, 0, 2)
-	if mode, ok := params["mode"].(string); ok && mode != "" {
-		meta = append(meta, fmt.Sprintf("mode=%s", mode))
+	if agent.Mode != "" {
+		meta = append(meta, fmt.Sprintf("mode=%s", agent.Mode))
 	}
-	if bg, ok := params["run_in_background"].(bool); ok && bg {
+	if agent.Background {
 		meta = append(meta, "background")
 	}
 	if len(meta) > 0 {
 		sb.WriteString(toolResultStyle.Render(fmt.Sprintf("  ⎿  [%s]", strings.Join(meta, ", "))) + "\n")
 	}
 
-	if prompt, ok := params["prompt"].(string); ok && prompt != "" {
+	if agent.Prompt != "" {
 		sb.WriteString(agentLabelStyle.Render("  ⎿  Prompt:") + "\n")
 		wrapWidth := width - lipgloss.Width(agentContentIndent)
-		for line := range strings.SplitSeq(prompt, "\n") {
+		for line := range strings.SplitSeq(agent.Prompt, "\n") {
 			for _, wrapped := range wrapLine(line, wrapWidth) {
 				sb.WriteString(toolResultExpandedStyle.Render(agentContentIndent+wrapped) + "\n")
 			}
@@ -685,34 +685,22 @@ func extractIntField(content, prefix string) int {
 }
 
 func formatAgentLabel(input string) string {
-	var params map[string]any
-	if err := json.Unmarshal([]byte(input), &params); err != nil {
+	agent := parseAgentInput(input)
+	if !agent.Valid {
 		return "Agent"
-	}
-
-	agentType := ""
-	if a, ok := params["subagent_type"].(string); ok && a != "" {
-		agentType = a
 	}
 
 	desc := ""
-	if d, ok := params["description"].(string); ok {
-		desc = conciseAgentDescription(d)
-	} else if p, ok := params["prompt"].(string); ok {
-		desc = conciseAgentDescription(p)
+	if agent.Description != "" {
+		desc = conciseAgentDescription(agent.Description)
+	} else if agent.Prompt != "" {
+		desc = conciseAgentDescription(agent.Prompt)
 	}
 
-	if agentType == "" {
-		if desc != "" {
-			return fmt.Sprintf("Agent: %s", desc)
-		}
-		return "Agent"
-	}
-	agentType = displayAgentType(agentType)
 	if desc != "" {
-		return fmt.Sprintf("Agent - %s: %s", agentType, desc)
+		return fmt.Sprintf("Agent - %s: %s", agent.Name, desc)
 	}
-	return fmt.Sprintf("Agent - %s", agentType)
+	return fmt.Sprintf("Agent - %s", agent.Name)
 }
 
 func conciseAgentDescription(desc string) string {
@@ -726,11 +714,82 @@ func conciseAgentDescription(desc string) string {
 	return desc
 }
 
-func displayAgentType(agentType string) string {
-	if strings.EqualFold(agentType, "general-purpose") {
-		return "General"
+func displayAgentName(agentType, mode string) string {
+	if isGenericAgentName(agentType) {
+		switch strings.ToLower(strings.TrimSpace(mode)) {
+		case "explore":
+			return "Explorer"
+		case "edit":
+			return "Editor"
+		}
+		switch strings.ToLower(strings.TrimSpace(agentType)) {
+		case "explore", "explorer":
+			return "Explorer"
+		case "edit", "editor":
+			return "Editor"
+		default:
+			return "General"
+		}
 	}
-	return agentType
+	return shortAgentName(agentType)
+}
+
+func isGenericAgentName(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "", "agent", "general", "general-purpose", "explore", "explorer", "edit", "editor":
+		return true
+	default:
+		return false
+	}
+}
+
+type agentInput struct {
+	Type        string `json:"subagent_type"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Prompt      string `json:"prompt"`
+	Mode        string `json:"mode"`
+	Background  bool   `json:"run_in_background"`
+	Valid       bool   `json:"-"`
+}
+
+func parseAgentInput(input string) agentInput {
+	var agent agentInput
+	if err := json.Unmarshal([]byte(input), &agent); err != nil {
+		return agentInput{}
+	}
+	agent.Valid = true
+	if agent.Type == "" {
+		agent.Type = "general-purpose"
+	}
+	if agent.Name == "" {
+		agent.Name = displayAgentName(agent.Type, agent.Mode)
+	}
+	return agent
+}
+
+func shortAgentName(name string) string {
+	words := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' '
+	})
+	kept := make([]string, 0, 2)
+	for _, word := range words {
+		word = strings.ToLower(strings.TrimSpace(word))
+		if word == "" || word == "current" || word == "change" || word == "changes" {
+			continue
+		}
+		kept = append(kept, word)
+		if len(kept) == 2 {
+			break
+		}
+	}
+	if len(kept) == 0 {
+		return "Agent"
+	}
+	for i, word := range kept {
+		kept[i] = strings.ToUpper(word[:1]) + word[1:]
+	}
+	return strings.Join(kept, " ")
 }
 
 func extractTaskGetDisplay(input string, ownerMap map[string]string) string {
@@ -829,6 +888,54 @@ func renderToolLine(label string, width int) string {
 func renderToolLineWithIcon(label string, width int, iconText string) string {
 	icon := toolCallStyle.Width(2).Render(iconText)
 	return lipgloss.JoinHorizontal(lipgloss.Top, icon, toolCallStyle.Render(truncateToolLabel(label, width)))
+}
+
+func renderAgentToolLine(label string, width int, iconText string, color string) string {
+	style := agentStyle(color)
+	icon := style.Width(2).Render(iconText)
+	return lipgloss.JoinHorizontal(lipgloss.Top, icon, style.Render(truncateToolLabel(label, width)))
+}
+
+func agentStyle(color string) lipgloss.Style {
+	return toolCallStyle.Foreground(agentColor(color))
+}
+
+func agentColor(color string) lipgloss.AdaptiveColor {
+	switch strings.ToLower(strings.TrimSpace(color)) {
+	case "blue":
+		return kit.CurrentTheme.Primary
+	case "yellow":
+		return kit.CurrentTheme.Warning
+	case "gray", "grey":
+		return kit.CurrentTheme.Muted
+	case "accent":
+		return kit.CurrentTheme.Accent
+	case "ai":
+		return kit.CurrentTheme.AI
+	case "green", "":
+		return kit.CurrentTheme.Success
+	default:
+		if strings.HasPrefix(color, "#") {
+			return lipgloss.AdaptiveColor{Dark: color, Light: color}
+		}
+		return kit.CurrentTheme.Success
+	}
+}
+
+func agentColorForInput(input string, colors map[string]string) string {
+	if len(colors) == 0 {
+		return ""
+	}
+	return colors[strings.ToLower(parseAgentInput(input).Type)]
+}
+
+const agentBlinkTicks = 6
+
+func agentIcon(tick int) string {
+	if (tick/agentBlinkTicks)%2 == 0 {
+		return "●"
+	}
+	return "○"
 }
 
 func truncateToolLabel(label string, width int) string {

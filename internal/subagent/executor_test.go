@@ -87,6 +87,20 @@ func TestPrepareRunConfigDoesNotLowerBuiltinMaxTurns(t *testing.T) {
 	}
 }
 
+func TestResolveModelIDUsesConfigBeforeParent(t *testing.T) {
+	executor := &Executor{parentModelID: "parent-model"}
+
+	if got := executor.resolveModelID("", "sonnet"); got != "claude-sonnet-4-20250514" {
+		t.Fatalf("config model = %q, want sonnet alias", got)
+	}
+	if got := executor.resolveModelID("", "inherit"); got != "parent-model" {
+		t.Fatalf("inherit model = %q, want parent", got)
+	}
+	if got := executor.resolveModelID("override-model", "sonnet"); got != "override-model" {
+		t.Fatalf("request override = %q, want override", got)
+	}
+}
+
 func TestShouldRetryWithParentModelOnlyForMissingDifferentModel(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -153,8 +167,8 @@ func TestFormatToolProgressUsesReadableAgentLabel(t *testing.T) {
 		"prompt":        "Inspect the codebase",
 	})
 
-	if got != "Agent - code-reviewer: HA code structure" {
-		t.Fatalf("formatToolProgress() = %q, want %q", got, "Agent - code-reviewer: HA code structure")
+	if got != "Agent - Code Reviewer: HA code structure" {
+		t.Fatalf("formatToolProgress() = %q, want %q", got, "Agent - Code Reviewer: HA code structure")
 	}
 }
 
@@ -166,6 +180,28 @@ func TestFormatToolProgressUsesShortGeneralName(t *testing.T) {
 
 	if got != "Agent - General: update repo references" {
 		t.Fatalf("formatToolProgress() = %q, want %q", got, "Agent - General: update repo references")
+	}
+}
+
+func TestFormatToolProgressNamesGeneralAgentByMode(t *testing.T) {
+	for _, tc := range []struct {
+		agent string
+		mode  string
+		desc  string
+		want  string
+	}{
+		{agent: "general-purpose", mode: "explore", desc: "inspect repo", want: "Agent - Explorer: inspect repo"},
+		{agent: "general-purpose", mode: "edit", desc: "update files", want: "Agent - Editor: update files"},
+		{agent: "explorer", mode: "edit", desc: "update files", want: "Agent - Editor: update files"},
+	} {
+		got := formatToolProgress("Agent", map[string]any{
+			"subagent_type": tc.agent,
+			"description":   tc.desc,
+			"mode":          tc.mode,
+		})
+		if got != tc.want {
+			t.Fatalf("formatToolProgress(mode=%s) = %q, want %q", tc.mode, got, tc.want)
+		}
 	}
 }
 

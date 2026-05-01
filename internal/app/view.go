@@ -9,6 +9,7 @@ import (
 	"github.com/genai-io/gen-code/internal/app/conv"
 	"github.com/genai-io/gen-code/internal/app/kit"
 	"github.com/genai-io/gen-code/internal/llm"
+	"github.com/genai-io/gen-code/internal/subagent"
 	"github.com/genai-io/gen-code/internal/task/tracker"
 )
 
@@ -213,6 +214,8 @@ func (m model) messageRenderParams() conv.MessageRenderParams {
 		ModelName:               m.env.GetModelID(),
 		InputTokens:             m.env.InputTokens,
 		OutputTokens:            m.env.OutputTokens,
+		Blink:                   m.conv.Blink,
+		AgentColors:             m.agentColors(),
 		Width:                   m.env.Width,
 		MDRenderer:              m.conv.MDRenderer,
 		SpinnerView:             m.conv.Spinner.View(),
@@ -220,6 +223,27 @@ func (m model) messageRenderParams() conv.MessageRenderParams {
 		TaskOwnerMap:            buildTaskOwnerMap(m.services.Tracker.List()),
 		InteractivePromptActive: m.conv.Modal.Question != nil && m.conv.Modal.Question.IsActive(),
 	}
+}
+
+func (m model) agentColors() map[string]string {
+	if m.services.Subagent == nil {
+		return nil
+	}
+	return buildAgentColors(m.services.Subagent.ListConfigs())
+}
+
+func buildAgentColors(configs []*subagent.AgentConfig) map[string]string {
+	if len(configs) == 0 {
+		return nil
+	}
+	colors := make(map[string]string, len(configs))
+	for _, cfg := range configs {
+		if cfg == nil || cfg.Color == "" {
+			continue
+		}
+		colors[strings.ToLower(cfg.Name)] = cfg.Color
+	}
+	return colors
 }
 
 func buildTaskOwnerMap(tasks []*tracker.Task) map[string]string {

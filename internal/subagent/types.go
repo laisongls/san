@@ -84,6 +84,9 @@ type AgentConfig struct {
 	// Description describes what this agent does (used for LLM decision making)
 	Description string `yaml:"description" json:"description"`
 
+	// Color is the display color used for this agent in the UI.
+	Color string `yaml:"color,omitempty" json:"color,omitempty"`
+
 	// WhenToUse provides guidance on when to use this agent (shown in <available-agents>)
 	WhenToUse string `yaml:"when-to-use,omitempty" json:"when_to_use,omitempty"`
 

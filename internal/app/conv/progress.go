@@ -2,8 +2,8 @@ package conv
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,8 +15,9 @@ import (
 
 // ProgressUpdateMsg carries a task progress update from an agent.
 type ProgressUpdateMsg struct {
-	Index   int
-	Message string
+	Index      int
+	ToolCallID string
+	Message    string
 }
 
 // ProgressQuestionMsg carries an agent question request to the TUI.
@@ -50,6 +51,14 @@ func NewProgressHub(buffer int) *ProgressHub {
 func (h *ProgressHub) SendForAgent(index int, msg string) {
 	select {
 	case h.ch <- ProgressUpdateMsg{Index: index, Message: msg}:
+	default:
+	}
+}
+
+// SendForToolCall enqueues a progress message for a specific tool call.
+func (h *ProgressHub) SendForToolCall(toolCallID string, msg string) {
+	select {
+	case h.ch <- ProgressUpdateMsg{Index: -1, ToolCallID: toolCallID, Message: msg}:
 	default:
 	}
 }
@@ -136,11 +145,13 @@ const maxAgentProgressHistory = 12
 // Older lines scroll off the top, keeping the view compact.
 const maxAgentProgressLines = 8
 
-// maxCompactAgentToolLines is the number of recent tool calls shown while collapsed.
-const maxCompactAgentToolLines = 3
+const (
+	maxCompactAgentToolLines  = 3
+	maxParallelAgentToolLines = 1
+)
 
-type AgentRuntimeMeta struct {
-	ModelName    string
+type AgentStats struct {
+	Model        string
 	InputTokens  int
 	OutputTokens int
 }
@@ -165,9 +176,7 @@ func renderAgentProgress(progress []string) string {
 	return sb.String()
 }
 
-// renderTaskProgressInline renders live progress for a parallel Agent tool call.
-// Spinner is on the header line; this only renders progress lines below it.
-func renderTaskProgressInline(tc core.ToolCall, pendingCalls []core.ToolCall, parallelResults map[int]bool, taskProgress map[int][]string, expanded bool, meta AgentRuntimeMeta) string {
+func renderAgentProgressInline(tc core.ToolCall, pendingCalls []core.ToolCall, parallelResults map[int]bool, taskProgress map[int][]string, expanded bool, limit int, stats AgentStats) string {
 	idx := -1
 	for i, pending := range pendingCalls {
 		if pending.ID == tc.ID {
@@ -190,59 +199,54 @@ func renderTaskProgressInline(tc core.ToolCall, pendingCalls []core.ToolCall, pa
 	if expanded {
 		return renderAgentProgress(progress)
 	}
-	return renderCompactAgentProgress(tc.Input, progress, meta)
+	return renderAgentProgressCompact(tc.Input, progress, limit, stats)
 }
 
-func renderCompactAgentProgress(input string, progress []string, meta AgentRuntimeMeta) string {
-	if len(progress) == 0 {
-		return ""
-	}
-
+func renderAgentProgressCompact(input string, progress []string, limit int, stats AgentStats) string {
 	var sb strings.Builder
-	if summary := formatAgentRuntimeSummary(input, progress, meta); summary != "" {
+	if summary := agentSummary(input, progress, stats); summary != "" {
 		sb.WriteString(toolResultStyle.Render("  ⎿  "+summary) + "\n")
 	}
 
-	toolLines := recentAgentToolProgress(progress, maxCompactAgentToolLines)
+	toolLines := agentToolLines(progress, limit)
 	for _, line := range toolLines {
 		sb.WriteString(toolResultStyle.Render("  ⎿  "+line) + "\n")
+	}
+	if len(toolLines) == 0 {
+		sb.WriteString(toolResultStyle.Render("  ⎿  "+agentStatus(progress)) + "\n")
 	}
 	return sb.String()
 }
 
-func formatAgentRuntimeSummary(input string, progress []string, meta AgentRuntimeMeta) string {
+func agentSummary(input string, progress []string, stats AgentStats) string {
 	parts := make([]string, 0, 4)
-	if model := agentModelFromInput(input, meta.ModelName); model != "" {
+	if model := agentModel(progress, stats.Model); model != "" {
 		parts = append(parts, "model: "+model)
 	}
-	if mode := agentModeFromInput(input, progress); mode != "" {
+	if mode := agentMode(input, progress); mode != "" {
 		parts = append(parts, "mode: "+mode)
 	}
-	if n := len(recentAgentToolProgress(progress, 0)); n > 0 {
+	if n := len(agentToolLines(progress, 0)); n > 0 {
 		parts = append(parts, fmt.Sprintf("tools: %d", n))
 	}
-	if tokens := formatRuntimeTokens(meta.InputTokens, meta.OutputTokens); tokens != "" {
+	if tokens := agentTokens(progress, stats); tokens != "" {
 		parts = append(parts, "tokens: "+tokens)
 	}
 	return strings.Join(parts, "   ")
 }
 
-func agentModelFromInput(input, fallback string) string {
-	var params map[string]any
-	if err := json.Unmarshal([]byte(input), &params); err == nil {
-		if model, ok := params["model"].(string); ok && model != "" {
-			return model
+func agentModel(progress []string, fallback string) string {
+	for i := len(progress) - 1; i >= 0; i-- {
+		if model, ok := strings.CutPrefix(strings.TrimSpace(progress[i]), "Model: "); ok {
+			return strings.TrimSpace(model)
 		}
 	}
 	return fallback
 }
 
-func agentModeFromInput(input string, progress []string) string {
-	var params map[string]any
-	if err := json.Unmarshal([]byte(input), &params); err == nil {
-		if mode, ok := params["mode"].(string); ok && mode != "" {
-			return mode
-		}
+func agentMode(input string, progress []string) string {
+	if mode := parseAgentInput(input).Mode; mode != "" {
+		return mode
 	}
 	for _, line := range progress {
 		if after, ok := strings.CutPrefix(line, "Mode: "); ok {
@@ -253,17 +257,64 @@ func agentModeFromInput(input string, progress []string) string {
 	return "default"
 }
 
-func formatRuntimeTokens(inputTokens, outputTokens int) string {
+func tokenSummary(inputTokens, outputTokens int) string {
 	if inputTokens <= 0 && outputTokens <= 0 {
 		return ""
 	}
 	return fmt.Sprintf("↑%s ↓%s", kit.FormatTokenCount(inputTokens), kit.FormatTokenCount(outputTokens))
 }
 
-func recentAgentToolProgress(progress []string, limit int) []string {
+func agentTokens(progress []string, stats AgentStats) string {
+	for i := len(progress) - 1; i >= 0; i-- {
+		inputTokens, outputTokens, ok := parseUsageProgress(progress[i])
+		if ok {
+			return tokenSummary(inputTokens, outputTokens)
+		}
+	}
+	return tokenSummary(stats.InputTokens, stats.OutputTokens)
+}
+
+func parseUsageProgress(line string) (int, int, bool) {
+	line = strings.TrimSpace(line)
+	rest, ok := strings.CutPrefix(line, "Usage: ")
+	if !ok {
+		return 0, 0, false
+	}
+	var inputTokens, outputTokens int
+	for _, field := range strings.Fields(rest) {
+		key, value, ok := strings.Cut(field, "=")
+		if !ok {
+			continue
+		}
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			continue
+		}
+		switch key {
+		case "input":
+			inputTokens = n
+		case "output":
+			outputTokens = n
+		}
+	}
+	return inputTokens, outputTokens, inputTokens > 0 || outputTokens > 0
+}
+
+func agentStatus(progress []string) string {
+	for i := len(progress) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(progress[i])
+		if line == "" || isAgentToolLine(line) || strings.HasPrefix(line, "Mode: ") || strings.HasPrefix(line, "Model: ") || strings.HasPrefix(line, "Usage: ") {
+			continue
+		}
+		return line
+	}
+	return "Starting..."
+}
+
+func agentToolLines(progress []string, limit int) []string {
 	lines := make([]string, 0, len(progress))
 	for _, line := range progress {
-		if isAgentToolProgressLine(line) {
+		if isAgentToolLine(line) {
 			lines = append(lines, line)
 		}
 	}
@@ -273,9 +324,9 @@ func recentAgentToolProgress(progress []string, limit int) []string {
 	return lines
 }
 
-func isAgentToolProgressLine(line string) bool {
+func isAgentToolLine(line string) bool {
 	line = strings.TrimSpace(line)
-	if line == "" || strings.HasPrefix(line, "Mode: ") || line == "Thinking..." {
+	if line == "" || strings.HasPrefix(line, "Mode: ") || strings.HasPrefix(line, "Model: ") || strings.HasPrefix(line, "Usage: ") || line == "Thinking..." {
 		return false
 	}
 	return true
@@ -299,6 +350,10 @@ type PendingToolSpinnerParams struct {
 	TaskProgress map[int][]string
 	// SpinnerView is the current spinner frame.
 	SpinnerView string
+	// Blink drives the agent running icon.
+	Blink int
+	// AgentColors maps agent type names to display colors.
+	AgentColors map[string]string
 	// Width is the terminal width for label truncation.
 	Width int
 	// SuppressAgentLabel avoids duplicating the active agent title when the
@@ -329,12 +384,15 @@ func RenderPendingToolSpinner(params PendingToolSpinnerParams) string {
 
 	// Agent tool: render agent label + progress lines
 	if tool.IsAgentToolName(toolName) {
+		if params.SuppressAgentLabel {
+			return ""
+		}
 		var sb strings.Builder
 		// Show Agent label so it remains visible after the assistant message scrolls off.
 		if !params.SuppressAgentLabel && params.PendingCalls != nil && params.CurrentIdx < len(params.PendingCalls) {
 			tc := params.PendingCalls[params.CurrentIdx]
 			label := formatAgentLabel(tc.Input)
-			sb.WriteString(renderToolLineWithIcon(label, params.Width, params.SpinnerView) + "\n")
+			sb.WriteString(renderAgentToolLine(label, params.Width, agentIcon(params.Blink), agentColorForInput(tc.Input, params.AgentColors)) + "\n")
 		}
 		sb.WriteString(renderAgentProgress(params.TaskProgress[params.CurrentIdx]))
 		return sb.String()

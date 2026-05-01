@@ -35,7 +35,7 @@ Usage notes:
 			},
 			"name": map[string]any{
 				"type":        "string",
-				"description": "Name for the spawned agent",
+				"description": "Optional short display name, usually 1-2 words. If omitted, explore mode uses Explorer and edit mode uses Editor.",
 			},
 			"run_in_background": map[string]any{
 				"type":        "boolean",

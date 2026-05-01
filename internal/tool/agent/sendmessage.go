@@ -64,6 +64,9 @@ func (t *SendMessageTool) PreparePermission(ctx context.Context, params map[stri
 
 	runBackground := tool.GetBool(normalized, "run_in_background")
 	effectiveModel := tool.GetString(normalized, "model")
+	if effectiveModel == "" && config.Model != "" && config.Model != "inherit" {
+		effectiveModel = config.Model
+	}
 	if effectiveModel == "" {
 		effectiveModel = t.executor.GetParentModelID()
 	}

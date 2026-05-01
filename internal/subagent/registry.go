@@ -75,6 +75,7 @@ func (r *Registry) registerBuiltins() {
 	r.agents["general-purpose"] = &AgentConfig{
 		Name:        "general-purpose",
 		Description: "General-purpose agent for researching complex questions, searching for code, and executing multi-step tasks.",
+		Color:       "green",
 		WhenToUse: `Use this when the task needs multiple searches, cross-file reasoning, implementation work, or another multi-step workflow.
 For non-mutating investigation, run this agent with mode=explore. For implementation work, run it with mode=edit or the default mode.`,
 		Model:          "inherit",
@@ -88,6 +89,7 @@ For non-mutating investigation, run this agent with mode=explore. For implementa
 	r.agents["code-simplifier"] = &AgentConfig{
 		Name:        "code-simplifier",
 		Description: "Simplifies and refines code for clarity, consistency, and maintainability while preserving all functionality.",
+		Color:       "blue",
 		WhenToUse: `Use this after implementing a feature or making changes to clean up the code.
 Focuses on recently modified code unless instructed otherwise.
 Good for reducing complexity, removing duplication, improving naming, and tightening logic.`,
@@ -105,6 +107,7 @@ Good for reducing complexity, removing duplication, improving naming, and tighte
 	r.agents["code-reviewer"] = &AgentConfig{
 		Name:        "code-reviewer",
 		Description: "Reviews code changes for bugs, security issues, performance problems, and style violations.",
+		Color:       "yellow",
 		WhenToUse: `Use this when you want an independent review of code changes before committing or merging.
 Good for catching issues you might have missed — security vulnerabilities, edge cases, naming problems, or logic errors.
 Returns a structured review with findings and recommendations.`,

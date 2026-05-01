@@ -34,6 +34,7 @@ type BuildParams struct {
 
 	PermissionDecider PermDecisionFunc
 	InteractionFunc   tool.InteractionFunc
+	ToolProgress      func(toolCallID string, msg string)
 }
 
 func buildAgent(p BuildParams) (core.Agent, *PermissionBridge, error) {
@@ -68,6 +69,9 @@ func buildAgent(p BuildParams) (core.Agent, *PermissionBridge, error) {
 	var adaptOpts []tool.AdaptOption
 	if p.InteractionFunc != nil {
 		adaptOpts = append(adaptOpts, tool.WithInteraction(p.InteractionFunc))
+	}
+	if p.ToolProgress != nil {
+		adaptOpts = append(adaptOpts, tool.WithToolProgress(p.ToolProgress))
 	}
 	pb := NewPermissionBridge(p.PermissionDecider)
 	var ag core.Agent

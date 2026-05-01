@@ -61,6 +61,9 @@ func (m *model) buildAgentParams() agent.BuildParams {
 		InteractionFunc: func(ctx context.Context, req *tool.QuestionRequest) (*tool.QuestionResponse, error) {
 			return m.conv.ProgressHub.Ask(ctx, 0, req)
 		},
+		ToolProgress: func(toolCallID string, msg string) {
+			m.conv.ProgressHub.SendForToolCall(toolCallID, msg)
+		},
 
 		PermissionDecider: func(name string, args map[string]any) agent.PermDecisionResult {
 			decision := m.services.Setting.HasPermissionToUseTool(name, args, m.env.SessionPermissions)

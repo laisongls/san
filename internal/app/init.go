@@ -160,6 +160,7 @@ func (a *agentRegistryAdapter) ListConfigs() []input.AgentConfigInfo {
 		out[i] = input.AgentConfigInfo{
 			Name:           cfg.Name,
 			Description:    cfg.Description,
+			Color:          cfg.Color,
 			Model:          cfg.Model,
 			PermissionMode: string(cfg.PermissionMode),
 			Tools:          tools,

@@ -9,6 +9,7 @@ import (
 
 type OutputModel struct {
 	Spinner      spinner.Model
+	Blink        int
 	MDRenderer   *MDRenderer
 	TaskProgress map[int][]string
 	ProgressHub  *ProgressHub

@@ -221,10 +221,7 @@ func (e *Executor) prepareRunConfig(req AgentRequest) (*runConfig, error) {
 
 	displayName := displayNameFor(config, req)
 
-	permMode := config.PermissionMode
-	if req.Mode != "" {
-		permMode = PermissionMode(req.Mode)
-	}
+	permMode := requestPermissionMode(config, req)
 
 	maxTurns := config.MaxTurns
 	if req.MaxTurns > maxTurns {
@@ -236,7 +233,7 @@ func (e *Executor) prepareRunConfig(req AgentRequest) (*runConfig, error) {
 
 	return &runConfig{
 		config:      config,
-		modelID:     e.resolveModelID(req.Model),
+		modelID:     e.resolveModelID(req.Model, config.Model),
 		maxTurns:    maxTurns,
 		displayName: displayName,
 		agentPrompt: e.buildSystemPrompt(config, permMode),
@@ -326,7 +323,7 @@ func (e *Executor) buildAgent(ctx context.Context, rc *runConfig, agentCwd strin
 		AgentType: rc.config.Name,
 		CWD:       agentCwd,
 		MaxTurns:  rc.maxTurns,
-		OutboxBuf: -1, // no outbox: subagents use direct ThinkAct path
+		OutboxBuf: 256,
 	})
 
 	return ag, cleanup, nil
@@ -389,11 +386,15 @@ func (e *Executor) fireSubagentStop(req AgentRequest, agentHookID, agentSessionI
 }
 
 // resolveModelID determines the model to use based on priority:
-// 1. Explicit request override (highest priority, aliases resolved)
-// 2. Parent conversation model (inherited)
-func (e *Executor) resolveModelID(requestModel string) string {
+// 1. Explicit request override
+// 2. Agent configuration
+// 3. Parent conversation model
+func (e *Executor) resolveModelID(requestModel string, configModel string) string {
 	if requestModel != "" {
 		return resolveModelAlias(requestModel)
+	}
+	if configModel != "" && configModel != "inherit" {
+		return resolveModelAlias(configModel)
 	}
 	return e.parentModelID
 }

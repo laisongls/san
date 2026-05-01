@@ -65,6 +65,15 @@ func (t *ToolExecState) MarkCurrent(toolCallID string) {
 	}
 }
 
+func (t *ToolExecState) IndexOf(toolCallID string) int {
+	for i, tc := range t.PendingCalls {
+		if tc.ID == toolCallID {
+			return i
+		}
+	}
+	return -1
+}
+
 func (t *ToolExecState) MarkComplete(toolCallID string) {
 	completedIdx := -1
 	for i, tc := range t.PendingCalls {

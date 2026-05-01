@@ -457,6 +457,8 @@ type ToolCallsParams struct {
 	ModelName         string
 	InputTokens       int
 	OutputTokens      int
+	Blink             int
+	AgentColors       map[string]string
 	SpinnerView       string
 	TaskOwnerMap      map[string]string
 	MDRenderer        *MDRenderer
@@ -484,11 +486,12 @@ func RenderToolCalls(params ToolCallsParams) string {
 		}
 		if tool.IsAgentToolName(tc.Name) {
 			label := formatAgentLabel(tc.Input)
+			color := agentColorForInput(tc.Input, params.AgentColors)
 			_, hasResult := params.ResultMap[tc.ID]
 			if hasResult {
-				sb.WriteString(renderToolLine(label, params.Width) + "\n")
+				sb.WriteString(renderAgentToolLine(label, params.Width, "●", color) + "\n")
 			} else {
-				sb.WriteString(renderToolLineWithIcon(label, params.Width, params.SpinnerView))
+				sb.WriteString(renderAgentToolLine(label, params.Width, agentIcon(params.Blink), color))
 				if !params.ToolCallsExpanded {
 					sb.WriteString(ThinkingStyle.Render("  (ctrl+o to expand)"))
 				}
@@ -531,8 +534,12 @@ func RenderToolCalls(params ToolCallsParams) string {
 			resultData.ToolInput = tc.Input
 			sb.WriteString(RenderToolResultInline(resultData, params.MDRenderer))
 		} else if tool.IsAgentToolName(tc.Name) {
-			sb.WriteString(renderTaskProgressInline(tc, params.PendingCalls, params.ParallelResults, params.TaskProgress, params.ToolCallsExpanded, AgentRuntimeMeta{
-				ModelName:    params.ModelName,
+			limit := maxCompactAgentToolLines
+			if params.ParallelMode {
+				limit = maxParallelAgentToolLines
+			}
+			sb.WriteString(renderAgentProgressInline(tc, params.PendingCalls, params.ParallelResults, params.TaskProgress, params.ToolCallsExpanded, limit, AgentStats{
+				Model:        params.ModelName,
 				InputTokens:  params.InputTokens,
 				OutputTokens: params.OutputTokens,
 			}))

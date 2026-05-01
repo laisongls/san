@@ -108,6 +108,8 @@ type AgentTaskInfo struct {
 type AgentConfigInfo struct {
 	Name           string
 	Description    string
+	Color          string
+	Model          string
 	PermissionMode string
 	Tools          []string
 }

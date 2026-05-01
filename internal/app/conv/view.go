@@ -16,6 +16,8 @@ type MessageRenderParams struct {
 	ModelName               string
 	InputTokens             int
 	OutputTokens            int
+	Blink                   int
+	AgentColors             map[string]string
 	Width                   int
 	MDRenderer              *MDRenderer
 	SpinnerView             string
@@ -162,6 +164,8 @@ func renderAssistantWithTools(p MessageRenderParams, msg core.ChatMessage, idx i
 		ModelName:         p.ModelName,
 		InputTokens:       p.InputTokens,
 		OutputTokens:      p.OutputTokens,
+		Blink:             p.Blink,
+		AgentColors:       p.AgentColors,
 		SpinnerView:       p.SpinnerView,
 		TaskOwnerMap:      p.TaskOwnerMap,
 		MDRenderer:        p.MDRenderer,
@@ -220,6 +224,8 @@ func renderPendingToolSpinnerFromParams(p MessageRenderParams, suppressAgentLabe
 		CurrentIdx:              p.CurrentIdx,
 		TaskProgress:            p.TaskProgress,
 		SpinnerView:             p.SpinnerView,
+		Blink:                   p.Blink,
+		AgentColors:             p.AgentColors,
 		Width:                   p.Width,
 		SuppressAgentLabel:      suppressAgentLabel,
 	})

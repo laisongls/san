@@ -34,6 +34,7 @@ type AdaptOption func(*adaptConfig)
 type adaptConfig struct {
 	askFn          InteractionFunc
 	messagesGetter MessagesGetter
+	progressFn     func(toolCallID string, msg string)
 }
 
 // WithInteraction sets the handler for interactive tools.
@@ -45,6 +46,11 @@ func WithInteraction(fn InteractionFunc) AdaptOption {
 // need it, such as Agent when fork=true.
 func WithMessagesGetterProvider(fn MessagesGetter) AdaptOption {
 	return func(c *adaptConfig) { c.messagesGetter = fn }
+}
+
+// WithToolProgress sets the handler for progress messages emitted by agent-like tools.
+func WithToolProgress(fn func(toolCallID string, msg string)) AdaptOption {
+	return func(c *adaptConfig) { c.progressFn = fn }
 }
 
 // AdaptTool wraps a legacy Tool as a core.Tool with a dynamic CWD resolver.
@@ -70,7 +76,7 @@ func AdaptToolRegistry(schemas []core.ToolSchema, cwd func() string, opts ...Ada
 	var adapted []core.Tool
 	for name, schema := range schemaByName {
 		if t, ok := Get(name); ok {
-			adapted = append(adapted, &toolAdapter{inner: t, schema: schema, cwd: cwd, askFn: cfg.askFn, messagesGetter: cfg.messagesGetter})
+			adapted = append(adapted, &toolAdapter{inner: t, schema: schema, cwd: cwd, askFn: cfg.askFn, messagesGetter: cfg.messagesGetter, progressFn: cfg.progressFn})
 		}
 	}
 	return core.NewTools(adapted...)
@@ -83,6 +89,7 @@ type toolAdapter struct {
 	cwd            func() string
 	askFn          InteractionFunc
 	messagesGetter MessagesGetter
+	progressFn     func(toolCallID string, msg string)
 }
 
 func (a *toolAdapter) Name() string            { return a.inner.Name() }
@@ -96,6 +103,13 @@ func (a *toolAdapter) Execute(ctx context.Context, input map[string]any) (string
 	}
 	if a.messagesGetter != nil {
 		ctx = WithMessagesGetter(ctx, a.messagesGetter)
+	}
+	if IsAgentToolName(a.inner.Name()) && a.progressFn != nil {
+		if callID := core.ToolCallIDFromContext(ctx); callID != "" {
+			input["_onProgress"] = ProgressFunc(func(msg string) {
+				a.progressFn(callID, msg)
+			})
+		}
 	}
 
 	var result toolresult.ToolResult

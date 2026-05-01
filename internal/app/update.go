@@ -68,6 +68,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.needsSpinner() {
 			var cmd tea.Cmd
 			m.conv.Spinner, cmd = m.conv.Spinner.Update(msg)
+			m.conv.Blink++
 			return m, cmd
 		}
 		return m, nil

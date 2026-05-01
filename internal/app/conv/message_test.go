@@ -308,13 +308,181 @@ func TestRenderToolCallsShowsGapForPendingAgent(t *testing.T) {
 			Input: `{"subagent_type":"Explore","description":"HA code structure","prompt":"Inspect the codebase"}`,
 		}},
 		CurrentIdx:  0,
+		Blink:       agentBlinkTicks,
 		SpinnerView: "◓",
 		Width:       100,
 	}
 
 	rendered := RenderToolCalls(params)
-	if !strings.Contains(rendered, "◓ Agent - Explore: HA code structure") {
+	if !strings.Contains(rendered, "○ Agent - Explorer: HA code structure") {
 		t.Fatalf("RenderToolCalls() = %q, want a single visible gap before explicit agent label", rendered)
+	}
+}
+
+func TestRenderToolCallsNamesGeneralAgentByMode(t *testing.T) {
+	call := core.ToolCall{
+		ID:    "tc-1",
+		Name:  "Agent",
+		Input: `{"subagent_type":"general-purpose","description":"audit git changes","mode":"explore"}`,
+	}
+	params := ToolCallsParams{
+		ToolCalls:    []core.ToolCall{call},
+		ResultMap:    map[string]ToolResultData{},
+		PendingCalls: []core.ToolCall{call},
+		CurrentIdx:   0,
+		Blink:        agentBlinkTicks,
+		SpinnerView:  "◓",
+		Width:        100,
+	}
+
+	rendered := stripANSI(RenderToolCalls(params))
+	if !strings.Contains(rendered, "○ Agent - Explorer: audit git changes") {
+		t.Fatalf("RenderToolCalls() = %q, want mode-based agent label", rendered)
+	}
+}
+
+func TestRenderToolCallsShowsSingleAgentRuntimeProgress(t *testing.T) {
+	call := core.ToolCall{
+		ID:    "tc-1",
+		Name:  "Agent",
+		Input: `{"subagent_type":"Explore","description":"audit git changes before review","prompt":"Inspect the codebase","mode":"explore"}`,
+	}
+	params := ToolCallsParams{
+		ToolCalls:    []core.ToolCall{call},
+		ResultMap:    map[string]ToolResultData{},
+		PendingCalls: []core.ToolCall{call},
+		CurrentIdx:   0,
+		TaskProgress: map[int][]string{
+			0: {
+				"Mode: explore · max 100 turns",
+				"Thinking...",
+				"Read(internal/tool/schema_agent.go)",
+				"Grep(ContinueAgent)",
+				"Read(internal/app/conv/message.go)",
+				"Grep(renderAgentProgressInline)",
+			},
+		},
+		ModelName:    "gpt-5.4-mini",
+		InputTokens:  18500,
+		OutputTokens: 467,
+		Blink:        agentBlinkTicks,
+		SpinnerView:  "◓",
+		Width:        120,
+	}
+
+	rendered := stripANSI(RenderToolCalls(params))
+	if !strings.Contains(rendered, "○ Agent - Explorer: audit git changes before review") {
+		t.Fatalf("RenderToolCalls() = %q, want agent header", rendered)
+	}
+	if !strings.Contains(rendered, "model: gpt-5.4-mini") || !strings.Contains(rendered, "mode: explore") || !strings.Contains(rendered, "tools: 4") {
+		t.Fatalf("RenderToolCalls() = %q, want runtime summary", rendered)
+	}
+	if strings.Contains(rendered, "Read(internal/tool/schema_agent.go)") {
+		t.Fatalf("RenderToolCalls() = %q, want only the latest three tool calls", rendered)
+	}
+	for _, want := range []string{"Grep(ContinueAgent)", "Read(internal/app/conv/message.go)", "Grep(renderAgentProgressInline)"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("RenderToolCalls() = %q, missing recent tool call %q", rendered, want)
+		}
+	}
+}
+
+func TestRenderToolCallsShowsAgentStatusBeforeToolCalls(t *testing.T) {
+	call := core.ToolCall{
+		ID:    "tc-1",
+		Name:  "Agent",
+		Input: `{"subagent_type":"Explore","description":"audit git changes","prompt":"Inspect the codebase","mode":"explore"}`,
+	}
+	params := ToolCallsParams{
+		ToolCalls:    []core.ToolCall{call},
+		ResultMap:    map[string]ToolResultData{},
+		PendingCalls: []core.ToolCall{call},
+		CurrentIdx:   0,
+		TaskProgress: map[int][]string{
+			0: {
+				"Mode: explore · max 100 turns",
+				"Thinking...",
+			},
+		},
+		ModelName:   "gpt-5.4-mini",
+		SpinnerView: "◓",
+		Width:       120,
+	}
+
+	rendered := stripANSI(RenderToolCalls(params))
+	if !strings.Contains(rendered, "model: gpt-5.4-mini") || !strings.Contains(rendered, "mode: explore") {
+		t.Fatalf("RenderToolCalls() = %q, want runtime summary before tool calls", rendered)
+	}
+	if !strings.Contains(rendered, "Thinking...") {
+		t.Fatalf("RenderToolCalls() = %q, want status before tool calls", rendered)
+	}
+}
+
+func TestRenderToolCallsUsesProgressModelForAgentSummary(t *testing.T) {
+	call := core.ToolCall{
+		ID:    "tc-1",
+		Name:  "Agent",
+		Input: `{"subagent_type":"Explore","description":"audit git changes","prompt":"Inspect the codebase","mode":"explore","model":"sonnet"}`,
+	}
+	params := ToolCallsParams{
+		ToolCalls:    []core.ToolCall{call},
+		ResultMap:    map[string]ToolResultData{},
+		PendingCalls: []core.ToolCall{call},
+		CurrentIdx:   0,
+		TaskProgress: map[int][]string{
+			0: {
+				"Model: gpt-5.5",
+				"Mode: explore · max 100 turns",
+				"Thinking...",
+			},
+		},
+		ModelName:   "gpt-5.4-mini",
+		SpinnerView: "◓",
+		Width:       120,
+	}
+
+	rendered := stripANSI(RenderToolCalls(params))
+	if !strings.Contains(rendered, "model: gpt-5.5") {
+		t.Fatalf("RenderToolCalls() = %q, want progress model", rendered)
+	}
+	if strings.Contains(rendered, "model: sonnet") {
+		t.Fatalf("RenderToolCalls() = %q, should not use raw tool input model", rendered)
+	}
+}
+
+func TestRenderToolCallsUsesProgressUsageForAgentTokens(t *testing.T) {
+	call := core.ToolCall{
+		ID:    "tc-1",
+		Name:  "Agent",
+		Input: `{"subagent_type":"general-purpose","description":"audit git changes","mode":"explore"}`,
+	}
+	params := ToolCallsParams{
+		ToolCalls:    []core.ToolCall{call},
+		ResultMap:    map[string]ToolResultData{},
+		PendingCalls: []core.ToolCall{call},
+		CurrentIdx:   0,
+		TaskProgress: map[int][]string{
+			0: {
+				"Model: kimi-k2.6",
+				"Mode: explore · max 100 turns",
+				"Usage: input=8300 output=272",
+				"Read(README.md)",
+				"Usage: input=9200 output=410",
+			},
+		},
+		ModelName:    "gpt-5.4-mini",
+		InputTokens:  100,
+		OutputTokens: 10,
+		SpinnerView:  "◓",
+		Width:        120,
+	}
+
+	rendered := stripANSI(RenderToolCalls(params))
+	if !strings.Contains(rendered, "tokens: ↑9.2k ↓410") {
+		t.Fatalf("RenderToolCalls() = %q, want latest progress token usage", rendered)
+	}
+	if strings.Contains(rendered, "tools: 3") {
+		t.Fatalf("RenderToolCalls() = %q, usage lines should not count as tools", rendered)
 	}
 }
 
