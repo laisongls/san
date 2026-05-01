@@ -4,9 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [v1.15.11] - 2026-05-01
 
+### Added
+
+- Permission mode support for agent execution (explore, edit, default)
+- Agent name display logic with generic vs. custom name handling
+- Comprehensive tests for new agent behaviors
+
 ### Changed
 
+- Refactor agent input parsing in tool rendering for cleaner code
 - Refactor: rename `continueagent` to `continuation` and remove deferred tool
+- Improve progress tracking and queue preview UX
 
 ## [v1.15.10] - 2026-05-01
 
