@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.15.13] - 2026-05-02
+
+### Changed
+
+- Remove the permission doc
+
 ## [v1.15.12] - 2026-05-02
 
 ### Added
