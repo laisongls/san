@@ -22,14 +22,7 @@ Gen Code is a terminal coding assistant with interchangeable LLM providers, assi
 - **LLM providers** — Anthropic, OpenAI, Google, Moonshot, Alibaba, MiniMax, Z.ai (GLM); swap via `/model`.
 - **Search backends** — Exa, Tavily, Brave, Serper; swap via `/search`.
 - **Personas** — Markdown identities scoped to user or project; swap via `/identity` ([details](docs/system-prompt.md#identity-custom-personas)).
-
-### Extensibility
-
-- **Claude Code compatible** — Skills, plugins, and MCP servers run unmodified.
-- **Skills** — User and project scope.
-- **Subagents** — Configurable permission modes, tool whitelists, optional sandboxing.
-- **Lifecycle hooks** — Shell, LLM, agent, and HTTP backends.
-- **Project memory** — User and project instructions auto-loaded.
+- **Skills & extensions** — Claude Code–compatible skills, plugins, and MCP servers run unmodified; subagents support permission modes, tool whitelists, and sandboxing; lifecycle hooks span shell, LLM, agent, and HTTP backends; project memory auto-loads user and project instructions.
 
 ### Engineering
 
@@ -74,56 +67,36 @@ mkdir -p ~/.local/bin && mv gen ~/.local/bin/
 ## Usage
 
 ```bash
-# Interactive mode
-gen
-
-# Non-interactive mode
-gen "explain this function"
-cat main.go | gen "review this code"
-
-# Resume previous session
-gen --continue        # Resume most recent
-gen --resume          # Select from list
+gen                            # interactive
+gen "explain this function"    # one-shot
+cat main.go | gen "review"     # piped input
+gen --continue                 # resume latest session
+gen --resume                   # pick a past session
 ```
 
-### Quick Start
+Run `/model` on first launch to connect a provider; `/help` lists all slash commands (`/identity`, `/search`, `/skills`, `/agents`, `/mcp`, `/compact`, `/resume`, …).
 
-1. Run `gen` to start interactive mode
-2. Use `/model` to connect a provider and select a model
-3. Start chatting!
-
-### Commands
-
-`/model` `/tools` `/skills` `/agents` `/identity` `/mcp` `/plugin` `/compact` `/think` `/search` `/loop` `/resume` `/fork` `/clear` `/init` `/memory` — type `/help` for details.
-
-Keyboard: `Shift+Tab` toggle permission mode, `Ctrl+O` expand tool details, `Ctrl+C` cancel, `Ctrl+D` exit.
+Keyboard: `Shift+Tab` permission mode · `Ctrl+O` expand tool details · `Ctrl+C` cancel · `Ctrl+D` exit.
 
 ## Configuration
 
-User-level config lives in `~/.gen/`; project-level files in `<project>/.gen/` override per workspace. Place a `GEN.md` (or `CLAUDE.md`) in your project root for project-specific instructions — Gen Code auto-loads them into the system prompt.
+Config lives in `~/.gen/` (user) and `<project>/.gen/` (project, overrides user). A `GEN.md` or `CLAUDE.md` at the project root is auto-loaded into the system prompt.
 
-### LLM provider credentials
+### Credentials
 
-| Provider | Environment Variables |
-|:---------|:----------------------|
+| Service | Variable |
+|:--------|:---------|
 | **Anthropic** (Claude) | `ANTHROPIC_API_KEY` or [Vertex AI](https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude) |
 | **OpenAI** (GPT, o-series, Codex) | `OPENAI_API_KEY` |
 | **Google** (Gemini) | `GOOGLE_API_KEY` |
 | **Moonshot** (Kimi) | `MOONSHOT_API_KEY` |
 | **Alibaba** (Qwen, DeepSeek) | `DASHSCOPE_API_KEY` |
 | **MiniMax** | `MINIMAX_API_KEY` |
-| **Z.ai** (智谱 GLM, via BigModel platform) | `BIGMODEL_API_KEY` |
-
-Run `/model` in the TUI to see the currently available model list.
-
-### Web-search backend credentials
-
-| Backend | Environment Variable |
-|:--------|:---------------------|
-| **Exa** | _none_ (default, no key required) |
-| **Tavily** | `TAVILY_API_KEY` |
-| **Brave Search** | `BRAVE_API_KEY` |
-| **Serper** | `SERPER_API_KEY` |
+| **Z.ai** (GLM) | `BIGMODEL_API_KEY` |
+| **Exa** search | _none_ (default) |
+| **Tavily** search | `TAVILY_API_KEY` |
+| **Brave** search | `BRAVE_API_KEY` |
+| **Serper** search | `SERPER_API_KEY` |
 
 <details>
 <summary><b>Directory layout</b></summary>
