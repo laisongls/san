@@ -16,6 +16,11 @@ const statusEl = $("#status");
 const state = {
   currentSession: null,
   records: [],
+  // seenIDs deduplicates records across SSE reconnects. The server starts
+  // each stream from offset 0 and replays the whole file, so on transient
+  // disconnects (laptop sleep, localhost blip) we'd otherwise accumulate
+  // duplicates. Each JSONL record carries a unique id field — use that.
+  seenIDs: new Set(),
   eventSource: null,
   filters: {
     message:   true,
@@ -85,9 +90,12 @@ function renderSessionList(list) {
   for (const s of list) {
     const li = document.createElement("li");
     li.dataset.id = s.id;
+    // s.id is derived from the transcripts/ filesystem listing. Today it
+    // is always a UUID, but filename-shaped data flowing into innerHTML
+    // shouldn't be trusted on principle. Escape consistently with title.
     li.innerHTML =
       '<div>' + escapeHTML(s.title || "(untitled)") + '</div>' +
-      '<span class="id">' + s.id.slice(0, 12) + '… · ' + Math.round(s.size / 1024) + 'KB</span>';
+      '<span class="id">' + escapeHTML(s.id.slice(0, 12)) + '… · ' + Math.round(s.size / 1024) + 'KB</span>';
     li.addEventListener("click", () => openSession(s.id, li));
     sessions.appendChild(li);
   }
@@ -103,6 +111,7 @@ function openSession(id, li) {
   }
   state.currentSession = id;
   state.records = [];
+  state.seenIDs.clear();
   timeline.innerHTML = "";
   detail.textContent = "Click a record to inspect its payload.";
   sessionMeta.textContent = id;
@@ -120,6 +129,12 @@ function openSession(id, li) {
     } catch (e) {
       return;
     }
+    // Browsers transparently reconnect EventSource on transient drops
+    // (laptop sleep, localhost blip). The server starts each stream from
+    // offset 0 and replays the whole file, so without dedup the timeline
+    // would balloon across reconnects. Each record's id is unique on disk.
+    if (rec.id && state.seenIDs.has(rec.id)) return;
+    if (rec.id) state.seenIDs.add(rec.id);
     state.records.push(rec);
     appendRow(rec, state.records.length - 1);
   };
