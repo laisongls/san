@@ -48,6 +48,9 @@ type requestState struct {
 // at construction time and stamped on every inference record. Mid-session
 // model swaps will be handled by a future model.changed event, not by mutating
 // the recorder.
+//
+// Cwd and ProjectID are needed at construction so the recorder can write
+// session.started before any telemetry — see NewRecorder for why.
 type RecorderOptions struct {
 	FileStore *transcript.FileStore
 	SessionID string
@@ -55,9 +58,31 @@ type RecorderOptions struct {
 	Provider  string
 	Model     string
 	MaxTokens int
+	Cwd       string
+	ProjectID string
 }
 
+// NewRecorder constructs a Recorder and ensures session.started lands on
+// disk BEFORE the recorder can be invoked. This matters because the caller
+// (core.NewAgent → System/Tools.SetObserver) immediately replays existing
+// sections/tools as synthetic events; those events create the transcript
+// file via AppendSystemSection / AppendTools. If session.started hasn't
+// been written first, the subsequent Store.Save → Start call short-circuits
+// on fileExists and provider/model/parent metadata is lost.
+//
+// Start is idempotent — a no-op on existing files — so callers (Store.Save)
+// that also invoke it stay correct.
 func NewRecorder(opts RecorderOptions) *Recorder {
+	if opts.FileStore != nil && opts.SessionID != "" {
+		_ = opts.FileStore.Start(context.Background(), transcript.StartCommand{
+			SessionID: opts.SessionID,
+			ProjectID: opts.ProjectID,
+			Cwd:       opts.Cwd,
+			Provider:  opts.Provider,
+			Model:     opts.Model,
+			Time:      time.Now(),
+		})
+	}
 	return &Recorder{
 		fs:        opts.FileStore,
 		sessionID: opts.SessionID,

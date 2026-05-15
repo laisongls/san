@@ -154,5 +154,7 @@ func (s *Setup) NewRecorder(agentID, provider, model string, maxTokens int) *Rec
 		Provider:  provider,
 		Model:     model,
 		MaxTokens: maxTokens,
+		Cwd:       st.cwd,
+		ProjectID: st.projectID,
 	})
 }
