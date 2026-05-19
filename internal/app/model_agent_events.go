@@ -102,9 +102,6 @@ func (m *model) OnTurnEnd(result core.Result) tea.Cmd {
 	if m.services.Tracker.AllDone() {
 		m.services.Tracker.Reset()
 	}
-	// Clear any plugin scope from the turn we just finished. The next
-	// /plugin-skill invocation sets it again before the next Send; a
-	// regular user prompt leaves it empty.
 	m.services.Agent.SetPluginRoot("")
 	log.QueueLog("OnTurnEnd: starting queueLen=%d", m.userInput.Queue.Len())
 	commitCmds := m.CommitMessages()

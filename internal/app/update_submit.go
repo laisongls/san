@@ -16,29 +16,22 @@ import (
 	"github.com/genai-io/gen-code/internal/log"
 )
 
-// handleSubmit is the Enter handler. The dispatch follows this shape:
-//
-//	Step 1: read textarea, early-exit on empty
-//	Step 2: if a turn is already streaming, queue this input and stop
-//	Step 3: otherwise hand off to dispatchSubmission for the normal path
+// handleSubmit is the Enter handler. Reads the textarea; if a turn is
+// already streaming, queues for later; otherwise runs the submission
+// pipeline.
 func (m *model) handleSubmit() tea.Cmd {
 	m.userInput.PromptSuggestion.Clear()
 
-	// Step 1: read raw input.
 	raw := strings.TrimSpace(m.userInput.FullValue())
 	if raw == "" && len(m.userInput.Images.Pending) == 0 {
 		return nil
 	}
 
-	// Step 2: if a turn is currently streaming, park the input in the
-	// queue and wait. The queue is drained at turn-boundary or after
-	// stream cancel.
 	if m.conv.Stream.Active {
 		log.QueueLog("handleSubmit: stream active, enqueue %q", raw)
 		return m.enqueueWhileStreaming(raw)
 	}
 
-	// Step 3: stream is idle — run the full submission pipeline.
 	log.QueueLog("handleSubmit: stream idle, normal submit %q", raw)
 	m.conv.Compact.ClearResult()
 	return m.dispatchSubmission(raw)
@@ -58,45 +51,29 @@ func (m *model) enqueueWhileStreaming(raw string) tea.Cmd {
 	return nil
 }
 
-// dispatchSubmission runs the actual submission pipeline. Shared by the
-// Enter handler (handleSubmit) and the queue drain that runs after
-// stream cancel (drainInputQueueAfterCancel).
-//
-//	Step 1: "exit" literal → quit
-//	Step 2: prompt hook gate → block with notice if rejected
-//	Step 3: record to input history before further branching
-//	Step 4: slash command? hand to the slash controller (manages its own
-//	        textarea + conv state)
-//	Step 5: send to agent — build user message (with image refs), append
-//	        to conv, reset textarea, hand off to SubmitToAgent
+// dispatchSubmission runs the submission pipeline: exit shortcut →
+// prompt-hook gate → history → slash command? → otherwise send to
+// agent. Shared by the Enter handler and drainInputQueueAfterCancel.
 func (m *model) dispatchSubmission(raw string) tea.Cmd {
-	// Step 1: exit literal.
 	if input.IsExitRequest(raw) {
 		cmd, _ := m.QuitWithCancel()
 		return cmd
 	}
 
-	// Step 2: prompt hook gate.
 	if blocked, reason := m.checkPromptHook(context.Background(), raw); blocked {
-		m.conv.Append(core.ChatMessage{Role: core.RoleNotice, Content: "Prompt blocked: " + reason})
+		m.conv.AddNotice("Prompt blocked: " + reason)
 		m.userInput.Reset()
 		return tea.Batch(m.CommitMessages()...)
 	}
 
-	// Step 3: history.
 	m.userInput.RecordSubmission(m.env.CWD, raw)
 
-	// Step 4: slash command — controller owns its own state changes.
 	if cmd, handled := m.runSlashCommandIfMatched(raw); handled {
 		return cmd
 	}
 
-	// Step 5: send to agent (no plugin scope — user-typed prompts run
-	// outside any plugin context). The previous turn's plugin root, if
-	// any, was already cleared by OnTurnEnd.
 	msg, ok := m.buildUserMessage(raw)
 	if !ok {
-		// image error notice already appended by buildUserMessage
 		return tea.Batch(m.CommitMessages()...)
 	}
 	m.conv.Append(msg)
@@ -118,7 +95,7 @@ func (m *model) runSlashCommandIfMatched(raw string) (tea.Cmd, bool) {
 func (m *model) buildUserMessage(raw string) (core.ChatMessage, bool) {
 	content, fileImages, err := input.ProcessImageRefs(m.env.CWD, raw)
 	if err != nil {
-		m.conv.Append(core.ChatMessage{Role: core.RoleNotice, Content: "Image error: " + err.Error()})
+		m.conv.AddNotice("Image error: " + err.Error())
 		return core.ChatMessage{}, false
 	}
 	displayContent := content
@@ -148,16 +125,12 @@ func (m *model) drainInputQueueAfterCancel() tea.Cmd {
 	return m.dispatchSubmission(item.Content)
 }
 
-// SubmitToAgent is the single exit point for every "send this content to
-// the agent" path — user Enter, slash command output, skill button, cron
-// fire, hook continuation, hub notification. It ensures the agent session
-// is up, hands `content` + `images` to the agent's inbox, and returns a
-// cmd that polls the outbox. Agent events flow back through Update →
-// routeToSubModel → conv.Update → model conv.Runtime callbacks
-// (see model_agent_events.go).
-//
-// On error (no provider connected, ensureAgentSession failed), appends a
-// notice to conv and returns a commit cmd — the agent is not contacted.
+// SubmitToAgent is the single exit point for "send this content to the
+// agent" — user Enter, slash command output, skill button, cron fire,
+// hook continuation, hub notification. Ensures the agent session is up,
+// pushes content+images onto its inbox, returns the outbox-poll cmd.
+// On no-provider or ensureAgentSession failure, posts a notice and
+// returns a commit cmd (the agent is not contacted).
 func (m *model) SubmitToAgent(content string, images []core.Image) tea.Cmd {
 	log.QueueLog("SubmitToAgent: %q", truncate(content, 60))
 	if m.env.LLMProvider == nil {
@@ -179,21 +152,17 @@ func (m *model) SubmitToAgent(content string, images []core.Image) tea.Cmd {
 	return sendCmd
 }
 
-// notifyNoProvider appends the standard "no provider connected" notice and
-// returns a commit cmd. Used by SubmitToAgent and callers that need to do
-// extra cleanup (e.g. skill ClearPending) before falling through to the
-// same message.
+// notifyNoProvider posts the standard "no provider connected" notice
+// and returns a commit cmd.
 func (m *model) notifyNoProvider() tea.Cmd {
 	m.conv.AddNotice("No provider connected. Use /model to connect.")
 	return tea.Batch(m.CommitMessages()...)
 }
 
-// HandleSkillInvocation runs the agent against a pending skill invocation.
-// Skill button -> consume the queued invocation -> append to conv -> hand
-// off to SubmitToAgent (carrying the plugin root so the resulting turn's
-// hooks/tools see PLUGIN_ROOT pointing at that plugin). Provider check is
-// up front because we want to clear the pending skill state when there's
-// nothing we can do.
+// HandleSkillInvocation runs the agent against the pending skill
+// invocation: consume → append to conv → SubmitToAgent. Plugin root
+// (if the skill came from a plugin) is set on the agent so hooks/tools
+// fired during the turn see PLUGIN_ROOT pointing at that plugin.
 func (m *model) HandleSkillInvocation() tea.Cmd {
 	if m.env.LLMProvider == nil {
 		m.userInput.Skill.ClearPending()

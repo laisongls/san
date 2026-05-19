@@ -14,11 +14,7 @@ type Task struct {
 	permBridge         *PermissionBridge
 	cancel             context.CancelFunc
 	pendingPermRequest *PermBridgeRequest
-	// pluginRoot scopes the current turn to a plugin (set by the slash
-	// command flow when the user invokes /plugin-skill, cleared at the
-	// next OnTurnEnd). Read by plugin.PluginEnv (via the registered
-	// root provider) when spawning hook scripts and tool subprocesses.
-	pluginRoot string
+	pluginRoot         string // see SetPluginRoot
 }
 
 func (s *Task) Start(params BuildParams, messages []core.Message) error {
@@ -68,6 +64,7 @@ func (s *Task) stopLocked() {
 	s.agent = nil
 	s.permBridge = nil
 	s.pendingPermRequest = nil
+	s.pluginRoot = ""
 }
 
 func (s *Task) Active() bool {

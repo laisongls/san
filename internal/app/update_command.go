@@ -1,9 +1,5 @@
-// Slash-command execution: builds SlashCommandEnv from services + env state,
-// runs commands through input.NewSlashCommandController.
-//
-// Note: services are passed by reference so commands read live state at
-// execution time. Snapshot values (UI dimensions, InputTokens, Cwd) are
-// captured here because they don't change while a command runs.
+// Slash-command execution: builds SlashCommandEnv and runs commands
+// through input.NewSlashCommandController.
 package app
 
 import (
