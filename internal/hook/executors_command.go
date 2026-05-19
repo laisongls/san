@@ -37,7 +37,7 @@ func (e *Engine) executeCommand(ctx context.Context, hookCmd setting.HookCmd, in
 	cwd := e.getCwd()
 	cmd := buildShellCommand(ctx, hookCmd, cwd)
 	cmd.Stdin = bytes.NewReader(inputJSON)
-	cmd.Env = e.buildEnv(input)
+	cmd.Env = e.buildEnv(ctx, input)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process != nil {
@@ -91,7 +91,7 @@ func (e *Engine) executeCommandBidirectional(ctx context.Context, hookCmd settin
 
 	cwd := e.getCwd()
 	cmd := buildShellCommand(ctx, hookCmd, cwd)
-	cmd.Env = e.buildEnv(input)
+	cmd.Env = e.buildEnv(ctx, input)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process != nil {

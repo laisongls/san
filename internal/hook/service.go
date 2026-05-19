@@ -55,7 +55,7 @@ type Options struct {
 	TranscriptPath string
 	Completer      LLMCompleter
 	ModelID        string
-	EnvProvider    func() []string
+	EnvProvider    func(context.Context) []string
 }
 
 // Initialize creates the singleton hook engine from the given options.

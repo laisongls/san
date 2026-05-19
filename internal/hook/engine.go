@@ -51,7 +51,7 @@ type Engine struct {
 	httpClient     *http.Client
 	asyncCallback  AsyncHookCallback
 	auditCallback  AuditCallback
-	envProvider    func() []string
+	envProvider    func(context.Context) []string
 
 	mu         sync.RWMutex
 	store      *hookStore
@@ -135,7 +135,7 @@ func (e *Engine) SetAsyncHookCallback(cb AsyncHookCallback) {
 
 // SetEnvProvider configures a function that supplies additional environment
 // variables for hook subprocess execution.
-func (e *Engine) SetEnvProvider(fn func() []string) {
+func (e *Engine) SetEnvProvider(fn func(context.Context) []string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.envProvider = fn

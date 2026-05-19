@@ -89,7 +89,7 @@ func (t *BashTool) ExecuteApproved(ctx context.Context, params map[string]any, c
 	// Execute command
 	cmd := exec.CommandContext(ctx, "bash", "-c", trackedCommand)
 	cmd.Dir = cwd
-	cmd.Env = bashEnv()
+	cmd.Env = bashEnv(ctx)
 	if trackedFile != "" {
 		cmd.Env = append(cmd.Env, cwdFileEnvVar+"="+trackedFile)
 	}
@@ -225,7 +225,7 @@ func (t *BashTool) executeBackground(ctx context.Context, command, description, 
 	// Create command
 	cmd := exec.CommandContext(taskCtx, "bash", "-c", command)
 	cmd.Dir = cwd
-	cmd.Env = bashEnv()
+	cmd.Env = bashEnv(ctx)
 
 	// Set process group so we can kill all child processes
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -366,18 +366,20 @@ func readTrackedCwd(path, fallback string) string {
 	return newCwd
 }
 
-var extraEnvProvider atomic.Value // stores func() []string
+var extraEnvProvider atomic.Value // stores func(context.Context) []string
 
 // SetEnvProvider registers a provider of additional environment variables
-// for Bash child processes (e.g., plugin-injected variables).
-func SetEnvProvider(fn func() []string) {
+// for Bash child processes (e.g., plugin-injected variables). The
+// provider is called with the per-invocation ctx so it can read
+// per-call values (like the active plugin root) from the context.
+func SetEnvProvider(fn func(context.Context) []string) {
 	extraEnvProvider.Store(fn)
 }
 
-func bashEnv() []string {
+func bashEnv(ctx context.Context) []string {
 	env := os.Environ()
-	if fn, ok := extraEnvProvider.Load().(func() []string); ok && fn != nil {
-		env = append(env, fn()...)
+	if fn, ok := extraEnvProvider.Load().(func(context.Context) []string); ok && fn != nil {
+		env = append(env, fn(ctx)...)
 	}
 	return env
 }

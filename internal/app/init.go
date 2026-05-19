@@ -54,6 +54,13 @@ func initInfrastructure() error {
 		return fmt.Errorf("failed to load scheduled tasks: %w", err)
 	}
 	fs.SetEnvProvider(plugin.PluginEnv)
+	// Cross-goroutine fallback: when an agent goroutine spawns a hook
+	// script or bash subprocess and ctx wasn't pre-loaded with the
+	// active plugin root, plugin.PluginEnv falls back to this provider.
+	// It reads the foreground task's per-turn plugin scope.
+	plugin.SetRootProvider(func() string {
+		return agent.Default().PluginRoot()
+	})
 
 	// Phase 4: session
 	session.Initialize(session.Options{CWD: appCwd})

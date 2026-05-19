@@ -128,17 +128,6 @@ routeKeypress → handleTextareaShortcut
         Step 3: 记录到输入历史（textarea 里的 ↑/↓ 回溯）
         Step 4: 是 slash 命令？───► 否（开头不是 "/"）
         Step 5: 发给 agent
-                  ├─ plugin.ClearActivePluginRoot()
-                  │     插件（一个插件 = 一个目录，包含 skill / agent /
-                  │     hook / MCP server）会通过 PLUGIN_ROOT 环境变量
-                  │     让自己的 hook 脚本和工具子进程能找到同目录文件。
-                  │     调用某个插件的 slash 命令或 skill 时，会把
-                  │     activePluginRoot 设成该插件的路径，整个回合内
-                  │     PLUGIN_ROOT 都指向它。普通用户输入不是替任何
-                  │     插件运行的，所以本回合开始之前先清掉——否则
-                  │     上一次插件的 PLUGIN_ROOT 会泄漏到这次 turn
-                  │     触发的 hook 里。
-                  │
                   ├─ buildUserMessage("hello") → ChatMessage{Role: user}
                   │     解析图片引用（`[image.png]` → 字节）并把内联
                   │     粘贴的图片从文本中分离出来。

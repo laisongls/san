@@ -14,7 +14,6 @@ import (
 	"github.com/genai-io/gen-code/internal/app/input"
 	"github.com/genai-io/gen-code/internal/core"
 	"github.com/genai-io/gen-code/internal/log"
-	"github.com/genai-io/gen-code/internal/plugin"
 )
 
 // handleSubmit is the Enter handler. The dispatch follows this shape:
@@ -92,8 +91,9 @@ func (m *model) dispatchSubmission(raw string) tea.Cmd {
 		return cmd
 	}
 
-	// Step 5: provider turn.
-	plugin.ClearActivePluginRoot()
+	// Step 5: send to agent (no plugin scope — user-typed prompts run
+	// outside any plugin context). The previous turn's plugin root, if
+	// any, was already cleared by OnTurnEnd.
 	msg, ok := m.buildUserMessage(raw)
 	if !ok {
 		// image error notice already appended by buildUserMessage
@@ -190,14 +190,19 @@ func (m *model) notifyNoProvider() tea.Cmd {
 
 // HandleSkillInvocation runs the agent against a pending skill invocation.
 // Skill button -> consume the queued invocation -> append to conv -> hand
-// off to SubmitToAgent. Provider check is up front because we want to
-// clear the pending skill state when there's nothing we can do.
+// off to SubmitToAgent (carrying the plugin root so the resulting turn's
+// hooks/tools see PLUGIN_ROOT pointing at that plugin). Provider check is
+// up front because we want to clear the pending skill state when there's
+// nothing we can do.
 func (m *model) HandleSkillInvocation() tea.Cmd {
 	if m.env.LLMProvider == nil {
 		m.userInput.Skill.ClearPending()
 		return m.notifyNoProvider()
 	}
-	displayMsg, fullMsg := m.userInput.Skill.ConsumeInvocation()
+	displayMsg, fullMsg, pluginRoot := m.userInput.Skill.ConsumeInvocation()
 	m.conv.Append(core.ChatMessage{Role: core.RoleUser, Content: fullMsg, DisplayContent: displayMsg})
+	if pluginRoot != "" {
+		m.services.Agent.SetPluginRoot(pluginRoot)
+	}
 	return m.SubmitToAgent(fullMsg, nil)
 }

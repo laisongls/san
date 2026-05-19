@@ -3,8 +3,9 @@
 package plugin
 
 import (
+	"context"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/genai-io/gen-code/internal/setting"
 )
@@ -110,34 +111,58 @@ func GetPluginNamespace(source string) string {
 	return name
 }
 
-// activeRoot tracks the plugin root for the currently executing skill or command.
-// Protected by activeRootMu for concurrent safety.
-var (
-	activeRootMu sync.RWMutex
-	activeRoot   string
-)
+// rootKey is the context-key type used to attach an active plugin root.
+type rootKey struct{}
 
-// SetActivePluginRoot sets the root path for the currently executing plugin.
-// Called when a plugin skill or custom command is invoked.
-func SetActivePluginRoot(path string) {
-	activeRootMu.Lock()
-	activeRoot = path
-	activeRootMu.Unlock()
+// WithRoot returns a context that carries `path` as the active plugin
+// root. Subprocess spawn paths that read PluginEnv(ctx) will then emit
+// PLUGIN_ROOT=<path> for hook scripts and tool subprocesses to find
+// their sibling files. Pass "" to leave ctx unchanged.
+func WithRoot(ctx context.Context, path string) context.Context {
+	if path == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, rootKey{}, path)
 }
 
-// ClearActivePluginRoot clears the active plugin root.
-// Called when the user submits a new regular message.
-func ClearActivePluginRoot() {
-	activeRootMu.Lock()
-	activeRoot = ""
-	activeRootMu.Unlock()
+// RootFromContext returns the active plugin root attached to ctx, if any.
+func RootFromContext(ctx context.Context) (string, bool) {
+	if ctx == nil {
+		return "", false
+	}
+	v, ok := ctx.Value(rootKey{}).(string)
+	if !ok || v == "" {
+		return "", false
+	}
+	return v, true
 }
 
-// getActivePluginRoot returns the current active plugin root.
-func getActivePluginRoot() string {
-	activeRootMu.RLock()
-	defer activeRootMu.RUnlock()
-	return activeRoot
+// rootProvider is a registered fallback that supplies the active plugin
+// root when ctx doesn't carry one. The app layer wires this to the
+// foreground agent task's per-turn scope so deep-inside-the-agent hook
+// firings still see the right PLUGIN_ROOT without threading ctx by hand.
+var rootProvider atomic.Value // stores func() string
+
+// SetRootProvider registers a fallback supplier of the active plugin
+// root, used when ctx doesn't carry one. Pass nil to clear.
+func SetRootProvider(fn func() string) {
+	if fn == nil {
+		rootProvider.Store((func() string)(nil))
+		return
+	}
+	rootProvider.Store(fn)
+}
+
+// activePluginRoot resolves the active plugin root: ctx first, then the
+// registered provider, else "".
+func activePluginRoot(ctx context.Context) string {
+	if r, ok := RootFromContext(ctx); ok {
+		return r
+	}
+	if fn, ok := rootProvider.Load().(func() string); ok && fn != nil {
+		return fn()
+	}
+	return ""
 }
 
 // FindPluginRootForPath returns the plugin root that contains the given path,
@@ -154,20 +179,24 @@ func FindPluginRootForPath(path string) string {
 	return ""
 }
 
-// PluginEnv returns environment variables for all enabled plugins.
-// Callers should append the result to os.Environ() when spawning child
-// processes so that plugin scripts can locate their resources via
-// GEN_PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT.
+// PluginEnv returns environment variables for all enabled plugins,
+// resolved for a subprocess spawned under ctx. Callers append the
+// result to os.Environ() when starting hook scripts or bash subprocs.
 //
-// Per plugin:
+// Per plugin (always emitted):
 //
 //	GEN_PLUGIN_ROOT_<UPPER_NAME>=<path>   CLAUDE_PLUGIN_ROOT_<UPPER_NAME>=<path>
 //
-// Unqualified alias — points to the active plugin root if set, otherwise
-// falls back to the sole enabled plugin (if exactly one):
+// Unqualified alias (active plugin root) — sourced in priority order:
 //
-//	GEN_PLUGIN_ROOT=<path>   CLAUDE_PLUGIN_ROOT=<path>
-func PluginEnv() []string {
+//  1. The active root attached to ctx via WithRoot
+//
+//  2. The registered fallback (SetRootProvider)
+//
+//  3. The sole enabled plugin's path, if exactly one is enabled
+//
+//     GEN_PLUGIN_ROOT=<path>   CLAUDE_PLUGIN_ROOT=<path>
+func PluginEnv(ctx context.Context) []string {
 	enabled := defaultRegistry.GetEnabled()
 	if len(enabled) == 0 {
 		return nil
@@ -178,7 +207,7 @@ func PluginEnv() []string {
 		out = append(out, setting.EnvPairF("PLUGIN_ROOT_%s", envSafeName(p.Name()), p.Path)...)
 	}
 
-	root := getActivePluginRoot()
+	root := activePluginRoot(ctx)
 	if root == "" && len(enabled) == 1 {
 		root = enabled[0].Path
 	}

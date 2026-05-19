@@ -63,13 +63,22 @@ type SkillState struct {
 	PendingInstructions string
 	PendingArgs         string
 	PendingFullName     string
+	// PendingPluginRoot is the plugin directory the pending invocation
+	// originated from (empty for non-plugin skills). When the invocation
+	// is consumed, the runner passes it to SubmitToAgent so the resulting
+	// agent turn sees PLUGIN_ROOT pointing at this plugin.
+	PendingPluginRoot string
 }
 
 // ConsumeInvocation extracts the pending skill invocation and clears pending
-// state. Returns (displayMsg, fullMsg): displayMsg is shown in chat UI;
-// fullMsg embeds the skill instructions, wrapped with a <command-name> tag
-// so the Skill tool can detect and skip a redundant call.
-func (s *SkillState) ConsumeInvocation() (displayMsg, fullMsg string) {
+// state. Returns (displayMsg, fullMsg, pluginRoot):
+//   - displayMsg is shown in chat UI
+//   - fullMsg embeds the skill instructions, wrapped with a <command-name> tag
+//     so the Skill tool can detect and skip a redundant call
+//   - pluginRoot is the plugin directory the invocation came from (empty
+//     for non-plugin skills); the caller forwards it to SubmitToAgent so
+//     hooks/tools spawned during this turn see PLUGIN_ROOT pointing at it
+func (s *SkillState) ConsumeInvocation() (displayMsg, fullMsg, pluginRoot string) {
 	displayMsg = s.PendingArgs
 	if displayMsg == "" {
 		displayMsg = "Execute the skill."
@@ -79,10 +88,12 @@ func (s *SkillState) ConsumeInvocation() (displayMsg, fullMsg string) {
 		fullMsg = "<command-name>" + s.PendingFullName + "</command-name>\n\n" +
 			s.PendingInstructions + "\n\n" + displayMsg
 	}
+	pluginRoot = s.PendingPluginRoot
 	s.PendingInstructions = ""
 	s.PendingArgs = ""
 	s.PendingFullName = ""
-	return displayMsg, fullMsg
+	s.PendingPluginRoot = ""
+	return displayMsg, fullMsg, pluginRoot
 }
 
 // SetPending stages a slash-command invocation. Caller may set PendingArgs
@@ -97,6 +108,7 @@ func (s *SkillState) ClearPending() {
 	s.PendingInstructions = ""
 	s.PendingArgs = ""
 	s.PendingFullName = ""
+	s.PendingPluginRoot = ""
 }
 
 func NewSkillSelector(reg *coreskill.Registry) SkillSelector {

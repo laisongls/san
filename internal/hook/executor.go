@@ -100,7 +100,7 @@ func (e *Engine) mergeOutcome(outcome, result HookOutcome) HookOutcome {
 	return outcome
 }
 
-func (e *Engine) buildEnv(input HookInput) []string {
+func (e *Engine) buildEnv(ctx context.Context, input HookInput) []string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -115,7 +115,7 @@ func (e *Engine) buildEnv(input HookInput) []string {
 		result = append(result, setting.EnvPair("TOOL_NAME", input.ToolName)...)
 	}
 	if fn := e.envProvider; fn != nil {
-		result = append(result, fn()...)
+		result = append(result, fn(ctx)...)
 	}
 	return result
 }

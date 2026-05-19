@@ -134,20 +134,6 @@ routeKeypress → handleTextareaShortcut
         Step 3: record to history (↑/↓ recall in the textarea)
         Step 4: slash command? ───► no (no leading "/")
         Step 5: send to agent
-                  ├─ plugin.ClearActivePluginRoot()
-                  │     Plugins (a plugin = a directory of skills /
-                  │     agents / hooks / MCP servers) export a
-                  │     PLUGIN_ROOT env var so their hook scripts and
-                  │     spawned tools can find sibling files. When a
-                  │     plugin's slash command or skill runs, it sets
-                  │     activePluginRoot to that plugin's path so
-                  │     PLUGIN_ROOT points there for the duration.
-                  │     A new user-typed prompt is not running on
-                  │     behalf of any plugin, so we clear the var
-                  │     before kicking off this turn — otherwise the
-                  │     last plugin's PLUGIN_ROOT would leak into the
-                  │     hooks fired by this turn.
-                  │
                   ├─ buildUserMessage("hello") → ChatMessage{Role: user}
                   │     Resolves image refs (`[image.png]` → bytes) and
                   │     splits inline-pasted images out of the text.

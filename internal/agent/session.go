@@ -14,6 +14,11 @@ type Task struct {
 	permBridge         *PermissionBridge
 	cancel             context.CancelFunc
 	pendingPermRequest *PermBridgeRequest
+	// pluginRoot scopes the current turn to a plugin (set by the slash
+	// command flow when the user invokes /plugin-skill, cleared at the
+	// next OnTurnEnd). Read by plugin.PluginEnv (via the registered
+	// root provider) when spawning hook scripts and tool subprocesses.
+	pluginRoot string
 }
 
 func (s *Task) Start(params BuildParams, messages []core.Message) error {
@@ -115,4 +120,22 @@ func (s *Task) System() core.System {
 		return nil
 	}
 	return s.agent.System()
+}
+
+// SetPluginRoot scopes the next agent turn to a plugin. The slash command
+// flow calls this when the user invokes a /plugin-skill so subprocesses
+// spawned during the turn see PLUGIN_ROOT pointing at that plugin.
+// Pass "" to clear (typically done at turn end).
+func (s *Task) SetPluginRoot(path string) {
+	s.mu.Lock()
+	s.pluginRoot = path
+	s.mu.Unlock()
+}
+
+// PluginRoot returns the plugin scope for the current turn, or "" if
+// no plugin scope is active.
+func (s *Task) PluginRoot() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.pluginRoot
 }

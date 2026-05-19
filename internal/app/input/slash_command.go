@@ -192,7 +192,7 @@ func (c SlashCommandController) executeSkillSlashCommand(sk *skill.Skill, args s
 		c.env.Input.Skill.SetPending(sk.FullName(), c.env.Skill.GetSkillInvocationPrompt(sk.FullName()))
 	}
 	if c.env.Plugin != nil {
-		plugin.SetActivePluginRoot(plugin.FindPluginRootForPath(sk.SkillDir))
+		c.env.Input.Skill.PendingPluginRoot = plugin.FindPluginRootForPath(sk.SkillDir)
 	}
 	if args != "" {
 		c.env.Input.Skill.PendingArgs = fmt.Sprintf("/%s %s", sk.FullName(), args)
@@ -207,7 +207,7 @@ func ApplySkillInvocation(state *Model, sk *skill.Skill, args string, skillSvc *
 		state.Skill.SetPending(sk.FullName(), skillSvc.GetSkillInvocationPrompt(sk.FullName()))
 	}
 	if pluginSvc != nil {
-		plugin.SetActivePluginRoot(plugin.FindPluginRootForPath(sk.SkillDir))
+		state.Skill.PendingPluginRoot = plugin.FindPluginRootForPath(sk.SkillDir)
 	}
 	if args != "" {
 		state.Skill.PendingArgs = fmt.Sprintf("/%s %s", sk.FullName(), args)
@@ -221,7 +221,7 @@ func (c SlashCommandController) executeCustomCommand(pc *command.CustomCommand, 
 		c.env.Input.Skill.SetPending(pc.FullName(), command.WrapInvocation(pc.FullName(), instructions))
 	}
 	if c.env.Plugin != nil {
-		plugin.SetActivePluginRoot(plugin.FindPluginRootForPath(pc.FilePath))
+		c.env.Input.Skill.PendingPluginRoot = plugin.FindPluginRootForPath(pc.FilePath)
 	}
 	c.env.Input.Skill.PendingArgs = formatSlashInvocation(pc.FullName(), args)
 	return ""
