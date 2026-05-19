@@ -44,27 +44,24 @@ type Job struct {
 	expr *expression // parsed expression (not serialized)
 }
 
-// Store manages cron jobs with thread-safe access.
+// Scheduler manages cron jobs with thread-safe access.
 // Session-only jobs are cleared when the process exits.
 // Durable jobs persist to storagePath across sessions.
-type Store struct {
+type Scheduler struct {
 	mu          sync.RWMutex
 	jobs        map[string]*Job
 	storagePath string // file path for durable job persistence (empty = disabled)
 }
 
-// Compile-time check that *Store implements Service.
-var _ Service = (*Store)(nil)
-
-// NewStore creates a new in-memory cron store.
-func NewStore() *Store {
-	return &Store{
+// NewScheduler creates a new in-memory *Scheduler.
+func NewScheduler() *Scheduler {
+	return &Scheduler{
 		jobs: make(map[string]*Job),
 	}
 }
 
 // Create adds a new cron job and returns it.
-func (s *Store) Create(cronExpr, prompt string, recurring, durable bool) (*Job, error) {
+func (s *Scheduler) Create(cronExpr, prompt string, recurring, durable bool) (*Job, error) {
 	expr, err := parse(cronExpr)
 	if err != nil {
 		return nil, err
@@ -109,7 +106,7 @@ func (s *Store) Create(cronExpr, prompt string, recurring, durable bool) (*Job, 
 }
 
 // Delete removes a job by ID.
-func (s *Store) Delete(id string) error {
+func (s *Scheduler) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -127,7 +124,7 @@ func (s *Store) Delete(id string) error {
 }
 
 // List returns copies of all active jobs sorted by next fire time.
-func (s *Store) List() []*Job {
+func (s *Scheduler) List() []*Job {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -144,7 +141,7 @@ func (s *Store) List() []*Job {
 }
 
 // Empty returns true if the store has no jobs.
-func (s *Store) Empty() bool {
+func (s *Scheduler) Empty() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.jobs) == 0
@@ -152,7 +149,7 @@ func (s *Store) Empty() bool {
 
 // Tick checks all jobs and returns prompts for any that should fire now.
 // It advances fired jobs to their next fire time or removes one-shot/expired jobs.
-func (s *Store) Tick() []FiredJob {
+func (s *Scheduler) Tick() []FiredJob {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -223,7 +220,7 @@ type FiredJob struct {
 
 // Add adds a pre-built job to the store, satisfying the Service interface.
 // The job must have a valid cron expression in the Cron field.
-func (s *Store) Add(job Job) error {
+func (s *Scheduler) Add(job Job) error {
 	expr, err := parse(job.Cron)
 	if err != nil {
 		return err
@@ -269,7 +266,7 @@ func (s *Store) Add(job Job) error {
 
 // Remove removes a job by ID, satisfying the Service interface.
 // Returns true if the job was found and removed.
-func (s *Store) Remove(id string) bool {
+func (s *Scheduler) Remove(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -287,7 +284,7 @@ func (s *Store) Remove(id string) bool {
 }
 
 // Reset removes all jobs.
-func (s *Store) Reset() {
+func (s *Scheduler) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.jobs = make(map[string]*Job)
@@ -296,14 +293,14 @@ func (s *Store) Reset() {
 
 // SetStoragePath sets the file path for durable job persistence.
 // Call LoadDurable() after this to restore previously saved jobs.
-func (s *Store) SetStoragePath(path string) {
+func (s *Scheduler) SetStoragePath(path string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.storagePath = path
 }
 
 // LoadDurable reads durable jobs from the storage file and merges them into the store.
-func (s *Store) LoadDurable() error {
+func (s *Scheduler) LoadDurable() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -407,7 +404,7 @@ func estimateRecurringPeriod(expr *expression, base time.Time) time.Duration {
 
 // saveDurableLocked writes all durable jobs to the storage file.
 // Must be called with s.mu held.
-func (s *Store) saveDurableLocked() {
+func (s *Scheduler) saveDurableLocked() {
 	if s.storagePath == "" {
 		return
 	}

@@ -18,41 +18,34 @@ The TUI's task panel reads from this registry; the `TaskOutput` and
 
 ## Contract
 
+Background task manager. Tracks bash and subagent tasks for the TUI panel and the TaskOutput/TaskList tools. The package exposes `*Tracker` directly — no Service interface.
+
 ```go
 package task
 
-// Service is the public contract for the task module.
-type Service interface {
-    // lifecycle
-    RegisterTask(t BackgroundTask)
-    CreateBashTask(cmd *exec.Cmd, command, description string,
-                   ctx context.Context, cancel context.CancelFunc) *BashTask
-    Get(id string) (BackgroundTask, bool)
-    List() []BackgroundTask
-    ListRunning() []BackgroundTask
-    Kill(id string) error
-    Remove(id string)
+// Tracker is the opaque handle. Type exported; fields unexported.
+type Tracker struct { /* internal fields */ }
 
-    // output
-    SetOutputDir(dir string) error
-}
+func (m *Tracker) RegisterTask(t BackgroundTask)
+func (m *Tracker) CreateBashTask(cmd *exec.Cmd, command, description string, ctx context.Context, cancel context.CancelFunc) *BashTask
+func (m *Tracker) Get(id string) (BackgroundTask, bool)
+func (m *Tracker) List() []BackgroundTask
+func (m *Tracker) ListRunning() []BackgroundTask
+func (m *Tracker) Kill(id string) error
+func (m *Tracker) Remove(id string)
+func (m *Tracker) SetOutputDir(dir string) error
+
+// Package-level access
+func Initialize(opts Options)
+func Default() *Tracker
+func SetDefaultTracker(m *Tracker)  // test-only
+func ResetDefaultTracker()          // test-only
 ```
 
-### Known Violations
-
-- **Rule 1 (small).** 8 methods. Borderline. `Get` / `List` /
-  `ListRunning` could collapse to `Get(id)` + `List(filter)`.
-- **`CreateBashTask` knows too much about Bash.** A generic
-  `RegisterRunningProcess(p Process)` factory would be more reusable.
-  The Bash-specific signature is convenient for the one caller but
-  prevents future task types (HTTP, async hook) from using the same
-  factory.
-- **Rule 5.** `Default()` returns `Service`.
-- **Singleton via `Default()`.**
 
 ## Internals
 
-- `Manager` (`manager.go`) — concrete implementation. Tracks active and
+- `Tracker` (`manager.go`) — concrete implementation. Tracks active and
   completed tasks under a mutex.
 - `BackgroundTask` (`types.go`) — interface implemented by `BashTask` and
   `AgentTask`.

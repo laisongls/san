@@ -11,7 +11,7 @@ import (
 // Deps holds the app-level state and callbacks needed to process Source 3 input.
 type Deps struct {
 	StreamActive bool
-	Cron         cron.Service
+	Cron         *cron.Scheduler
 	InjectCron   func(string) tea.Cmd
 	InjectHook   func(AsyncHookRewake) tea.Cmd
 	AppendNotice func(string)
@@ -83,7 +83,7 @@ type CronResult struct {
 	Notices      []string
 }
 
-func (s *Model) HandleCronTick(cronSvc cron.Service, isIdle bool) CronResult {
+func (s *Model) HandleCronTick(cronSvc *cron.Scheduler, isIdle bool) CronResult {
 	var result CronResult
 
 	if cronSvc == nil || (cronSvc.Empty() && len(s.CronQueue) == 0) {

@@ -47,9 +47,9 @@ type CommandDeps struct {
 	Plugin  *plugin.Registry
 	MCP     *mcp.Registry
 	Tracker tracker.Service
-	Cron    cron.Service
-	ToolSvc tool.Service
-	Command command.Service
+	Cron    *cron.Scheduler
+	ToolSvc *tool.Registry
+	Command *command.Registry
 
 	// State getters (values that may change during command execution)
 	GetSessionID      func() string
@@ -547,7 +547,7 @@ func (c *CommandController) handleLoopCommand(_ context.Context, args string) (s
 	return "", c.deps.StartProviderTurn(parsed.Prompt), nil
 }
 
-func handleLoopAdminCommand(cronSvc cron.Service, args string) (string, bool, error) {
+func handleLoopAdminCommand(cronSvc *cron.Scheduler, args string) (string, bool, error) {
 	fields := strings.Fields(args)
 	if len(fields) == 0 {
 		return "", false, nil
@@ -581,7 +581,7 @@ func handleLoopAdminCommand(cronSvc cron.Service, args string) (string, bool, er
 	}
 }
 
-func renderLoopJobList(cronSvc cron.Service) string {
+func renderLoopJobList(cronSvc *cron.Scheduler) string {
 	jobs := cronSvc.List()
 	if len(jobs) == 0 {
 		return "No scheduled loop tasks."

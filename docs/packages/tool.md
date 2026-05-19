@@ -19,44 +19,28 @@ and audit metadata.
 
 ## Contract
 
+Built-in tool registry: tools register at init time; consumers fetch by name and dispatch through the permission gate. The package exposes `*Registry` directly — no Service interface.
+
 ```go
 package tool
 
-// Service is the public contract for the tool module.
-type Service interface {
-    // registration
-    Register(t Tool)
-    RegisterAlias(alias string, t Tool)
-    Get(name string) (Tool, bool)
-    List() []string
+// Registry is the opaque handle. Type exported; fields unexported.
+type Registry struct { /* internal fields */ }
 
-    // execution
-    Execute(ctx context.Context, name string, params map[string]any, cwd string) toolresult.ToolResult
+func (r *Registry) Register(t Tool)
+func (r *Registry) RegisterAlias(alias string, t Tool)
+func (r *Registry) Get(name string) (Tool, bool)
+func (r *Registry) List() []string
+func (r *Registry) Execute(ctx context.Context, name string, params map[string]any, cwd string) toolresult.ToolResult
+func (r *Registry) PopSideEffect(toolCallID string) any
 
-    // side effects
-    PopSideEffect(toolCallID string) any
-}
+// Package-level access
+func Initialize(opts Options)
+func Default() *Registry
+func SetDefaultRegistry(r *Registry)  // test-only
+func ResetDefaultRegistry()           // test-only
 ```
 
-`Tool` itself is defined in [`packages/core.md`](core.md). The built-in
-tool implementations live under `internal/tool/{fs,web,agent,task,perm,
-mode,skill,tasktools,toolresult}/`.
-
-### Known Violations
-
-- **Rule 1 (small).** 6 methods on `Service` spanning registration,
-  execution, and a side-effect escape hatch. Acceptable; the seam is
-  cohesive. Possible future split: `ToolRegistry` (Register/Get/List) vs
-  `ToolDispatcher` (Execute/PopSideEffect).
-- **Rule 5 (constructors return concrete types).** `Default()` returns
-  `Service`; `defaultRegistry` is the only implementation. Returning
-  `*Registry` would let tests substitute behavior without `SetDefault`.
-- **`PopSideEffect` is a leaky abstraction.** Side effects (e.g. file
-  edits queued for confirmation) flow through a parallel channel rather
-  than the `ToolResult` value. Callers must remember to pop or leak data.
-  Consider folding side effects into `ToolResult`.
-- **Singleton via `Default()`.** Same as the rest of the codebase. Move
-  to composition root.
 
 ## Internals
 

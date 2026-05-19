@@ -1,70 +1,39 @@
+// Package tool is the registry of built-in tools the agent can call.
+// Exposes *Registry directly — no Service interface.
 package tool
-
-import (
-	"context"
-	"sync"
-
-	"github.com/genai-io/gen-code/internal/tool/toolresult"
-)
-
-// Service is the public contract for the tool module.
-type Service interface {
-	// registration
-	Register(t Tool)
-	RegisterAlias(alias string, t Tool)
-	Get(name string) (Tool, bool)
-	List() []string
-
-	// execution
-	Execute(ctx context.Context, name string, params map[string]any, cwd string) toolresult.ToolResult
-
-	// side effects
-	PopSideEffect(toolCallID string) any
-}
-
-// Compile-time check: *Registry implements Service.
-var _ Service = (*Registry)(nil)
 
 // Options holds all dependencies for initialization.
 type Options struct{}
 
-// ── singleton ──────────────────────────────────────────────
-
-var (
-	mu       sync.RWMutex
-	instance Service
-)
-
-// Initialize sets the singleton to the default registry.
+// Initialize installs the package-level *Registry as the default.
+// Tools register at init time before Initialize runs; this is a
+// no-op trigger for consistency with other packages' Initialize.
 func Initialize(opts Options) {
-	mu.Lock()
-	instance = defaultRegistry
-	mu.Unlock()
+	defaultInstance = defaultRegistry
 }
 
-// Default returns the singleton Service instance.
-// Falls back to defaultRegistry if Initialize has not been called,
-// since tools register at init time before Initialize runs.
-func Default() Service {
-	mu.RLock()
-	s := instance
-	mu.RUnlock()
-	if s != nil {
-		return s
+// Default returns the package-level *Registry.
+func Default() *Registry {
+	if defaultInstance != nil {
+		return defaultInstance
 	}
 	return defaultRegistry
 }
 
-// SetDefault replaces the singleton instance. Intended for tests.
-func SetDefault(s Service) {
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+// SetDefaultRegistry replaces the package-level registry. Intended for
+// tests. A nil argument restores the package default.
+func SetDefaultRegistry(r *Registry) {
+	if r == nil {
+		defaultInstance = defaultRegistry
+		return
+	}
+	defaultInstance = r
 }
 
-// ResetService clears the singleton instance. Intended for tests.
-func ResetService() {
-	mu.Lock()
-	instance = nil
-	mu.Unlock()
+// ResetDefaultRegistry restores the package default. Intended for
+// tests.
+func ResetDefaultRegistry() {
+	defaultInstance = defaultRegistry
 }
+
+var defaultInstance *Registry

@@ -72,7 +72,7 @@ func RegisterFakeTool(t *testing.T, name, result string) {
 	tool.Register(&fakeTool{name: name, result: result})
 	t.Cleanup(func() {
 		tool.Unregister(name)
-		tool.ResetService()
+		tool.ResetDefaultRegistry()
 	})
 }
 

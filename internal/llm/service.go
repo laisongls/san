@@ -1,37 +1,22 @@
+// Package llm holds the connected LLM provider plus the registry of
+// available providers/models. Exposes *Hub directly. *Hub
+// wraps the package-level *Setup (mutable provider/model/store under
+// a mutex).
 package llm
 
-import (
-	"context"
-	"sync"
-)
+import "context"
 
-// Service is the public contract for the llm module.
-type Service interface {
-	// connection
-	Provider() Provider              // current active provider
-	SetProvider(p Provider)          // switch provider
-	ModelID() string                 // current model identifier
-	CurrentModel() *CurrentModelInfo // full model metadata
-	SetCurrentModel(info *CurrentModelInfo)
-
-	// factory
-	NewClient(model string, maxTokens int) *Client
-
-	// store
-	Store() *Store // underlying provider persistence store
-
-	// registry
-	ListProviders() map[Name][]Info // all registered providers with status
+// Hub is the concrete handle callers hold. Methods are
+// mutex-protected views over the underlying *Setup.
+type Hub struct {
+	setup *Setup
 }
-
-// Compile-time check: *service implements Service.
-var _ Service = (*service)(nil)
 
 // Options holds configuration for Initialize.
 type Options struct{}
 
 // Initialize discovers and connects to the best available LLM provider,
-// then publishes the result as the singleton Service.
+// then publishes the result as the package-level *Hub.
 func Initialize(opts Options) {
 	store, _ := NewStore()
 	if store == nil {
@@ -72,84 +57,69 @@ func Initialize(opts Options) {
 	setSingleton()
 }
 
-// -- singleton ---------------------------------------------------------------
+// Default returns the package-level *Hub.
+func Default() *Hub {
+	return defaultHub
+}
 
-var (
-	mu       sync.RWMutex
-	instance Service
-)
-
-// Default returns the singleton Service instance.
-// Panics if Initialize has not been called.
-func Default() Service {
-	mu.RLock()
-	s := instance
-	mu.RUnlock()
+// SetDefaultHub replaces the package-level *Hub. Intended for
+// tests. A nil argument restores a fresh empty *Hub.
+func SetDefaultHub(s *Hub) {
 	if s == nil {
-		panic("llm: not initialized")
+		defaultHub = &Hub{setup: &Setup{}}
+		return
 	}
-	return s
+	defaultHub = s
 }
 
-// SetDefault replaces the singleton instance. Intended for tests.
-func SetDefault(s Service) {
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+// ResetDefaultHub restores a fresh empty *Hub. Intended for
+// tests.
+func ResetDefaultHub() {
+	defaultHub = &Hub{setup: &Setup{}}
 }
 
-// ResetService clears the singleton instance. Intended for tests.
-func ResetService() {
-	mu.Lock()
-	instance = nil
-	mu.Unlock()
-}
+var defaultHub = &Hub{setup: defaultSetup}
 
-// -- implementation ----------------------------------------------------------
+// --- methods (mutex-protected views over Setup) ---
 
-// service wraps the Setup struct to satisfy the Service interface.
-type service struct {
-	setup *Setup
-}
-
-func (s *service) Provider() Provider {
+func (s *Hub) Provider() Provider {
 	s.setup.mu.RLock()
 	defer s.setup.mu.RUnlock()
 	return s.setup.Provider
 }
 
-func (s *service) SetProvider(p Provider) {
+func (s *Hub) SetProvider(p Provider) {
 	s.setup.mu.Lock()
 	defer s.setup.mu.Unlock()
 	s.setup.Provider = p
 }
 
-func (s *service) ModelID() string { return s.setup.ModelID() }
+func (s *Hub) ModelID() string { return s.setup.ModelID() }
 
-func (s *service) CurrentModel() *CurrentModelInfo {
+func (s *Hub) CurrentModel() *CurrentModelInfo {
 	s.setup.mu.RLock()
 	defer s.setup.mu.RUnlock()
 	return s.setup.CurrentModel
 }
 
-func (s *service) SetCurrentModel(info *CurrentModelInfo) {
+func (s *Hub) SetCurrentModel(info *CurrentModelInfo) {
 	s.setup.mu.Lock()
 	defer s.setup.mu.Unlock()
 	s.setup.CurrentModel = info
 }
 
-func (s *service) Store() *Store {
+func (s *Hub) Store() *Store {
 	s.setup.mu.RLock()
 	defer s.setup.mu.RUnlock()
 	return s.setup.Store
 }
 
-func (s *service) NewClient(model string, maxTokens int) *Client {
+func (s *Hub) NewClient(model string, maxTokens int) *Client {
 	p := s.Provider()
 	return NewClient(p, model, maxTokens)
 }
 
-func (s *service) ListProviders() map[Name][]Info {
+func (s *Hub) ListProviders() map[Name][]Info {
 	st := s.Store()
 	return GetProvidersWithStatus(st)
 }

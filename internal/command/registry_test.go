@@ -9,37 +9,29 @@ import (
 // saveAndRestore saves current singleton state and restores it on cleanup.
 func saveAndRestore(t *testing.T) {
 	t.Helper()
-	mu.RLock()
-	prev := instance
-	mu.RUnlock()
-	t.Cleanup(func() {
-		mu.Lock()
-		instance = prev
-		mu.Unlock()
-	})
+	prev := defaultRegistry
+	t.Cleanup(func() { SetDefaultRegistry(prev) })
 }
 
 // initTestService creates a fresh service and sets it as the singleton.
-func initTestService(t *testing.T, cwd string, opts ...func(*service)) *service {
+func initTestService(t *testing.T, cwd string, opts ...func(*Registry)) *Registry {
 	t.Helper()
-	s := &service{cwd: cwd}
+	s := &Registry{cwd: cwd}
 	for _, opt := range opts {
 		opt(s)
 	}
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+	SetDefaultRegistry(s)
 	return s
 }
 
-func withDynamicProviders(providers ...func() []Info) func(*service) {
-	return func(s *service) {
+func withDynamicProviders(providers ...func() []Info) func(*Registry) {
+	return func(s *Registry) {
 		s.dynamicInfoProviders = append([]func() []Info(nil), providers...)
 	}
 }
 
-func withPluginCommandPaths(fn func() []PluginCommandPath) func(*service) {
-	return func(s *service) {
+func withPluginCommandPaths(fn func() []PluginCommandPath) func(*Registry) {
+	return func(s *Registry) {
 		s.pluginCommandPaths = fn
 	}
 }

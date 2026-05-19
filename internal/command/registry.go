@@ -109,7 +109,7 @@ func (cc *CustomCommand) GetInstructions() string {
 }
 
 // service is the internal implementation of Service.
-type service struct {
+type Registry struct {
 	mu                   sync.RWMutex
 	cwd                  string
 	cachedCustomCommands []CustomCommand
@@ -117,7 +117,7 @@ type service struct {
 	pluginCommandPaths   func() []PluginCommandPath
 }
 
-func (s *service) BuiltinNames() map[string]Info {
+func (s *Registry) BuiltinNames() map[string]Info {
 	cmds := builtinCommands()
 	m := make(map[string]Info, len(cmds))
 	for _, c := range cmds {
@@ -126,7 +126,7 @@ func (s *service) BuiltinNames() map[string]Info {
 	return m
 }
 
-func (s *service) Get(name string) (Info, bool) {
+func (s *Registry) Get(name string) (Info, bool) {
 	// Check builtins first.
 	builtins := s.BuiltinNames()
 	if info, ok := builtins[name]; ok {
@@ -149,7 +149,7 @@ func (s *service) Get(name string) (Info, bool) {
 	return Info{}, false
 }
 
-func (s *service) List() []Info {
+func (s *Registry) List() []Info {
 	seen := make(map[string]bool)
 	var all []Info
 
@@ -181,11 +181,11 @@ func (s *service) List() []Info {
 	return all
 }
 
-func (s *service) ListCustom() []CustomCommand {
+func (s *Registry) ListCustom() []CustomCommand {
 	return s.loadAllCustomCommands()
 }
 
-func (s *service) GetMatching(prefix string) []Info {
+func (s *Registry) GetMatching(prefix string) []Info {
 	query := strings.ToLower(strings.TrimPrefix(prefix, "/"))
 	matches := make([]Info, 0)
 	seen := make(map[string]bool)
@@ -224,7 +224,7 @@ func (s *service) GetMatching(prefix string) []Info {
 	return matches
 }
 
-func (s *service) IsCustomCommand(cmd string) (*CustomCommand, bool) {
+func (s *Registry) IsCustomCommand(cmd string) (*CustomCommand, bool) {
 	for _, c := range s.loadAllCustomCommands() {
 		if c.FullName() == cmd || c.Name == cmd {
 			return &c, true
@@ -233,7 +233,7 @@ func (s *service) IsCustomCommand(cmd string) (*CustomCommand, bool) {
 	return nil, false
 }
 
-func (s *service) GetCustomCommands() []Info {
+func (s *Registry) GetCustomCommands() []Info {
 	cmds := s.loadAllCustomCommands()
 	infos := make([]Info, 0, len(cmds))
 	for _, c := range cmds {
@@ -245,7 +245,7 @@ func (s *service) GetCustomCommands() []Info {
 	return infos
 }
 
-func (s *service) getDynamicInfoProviders() []func() []Info {
+func (s *Registry) getDynamicInfoProviders() []func() []Info {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return append([]func() []Info(nil), s.dynamicInfoProviders...)
@@ -253,7 +253,7 @@ func (s *service) getDynamicInfoProviders() []func() []Info {
 
 // loadAllCustomCommands returns custom commands from all sources, using cache
 // when available. The cache is invalidated by Initialize.
-func (s *service) loadAllCustomCommands() []CustomCommand {
+func (s *Registry) loadAllCustomCommands() []CustomCommand {
 	s.mu.RLock()
 	if s.cachedCustomCommands != nil {
 		defer s.mu.RUnlock()
@@ -276,7 +276,7 @@ func (s *service) loadAllCustomCommands() []CustomCommand {
 // 3. .gen/plugins/*/commands/   (project-plugin)
 // 4. .gen/commands/          (project level, highest priority)
 // Higher-priority commands override lower-priority ones with the same full name.
-func (s *service) loadCustomCommandsFromDisk() []CustomCommand {
+func (s *Registry) loadCustomCommandsFromDisk() []CustomCommand {
 	cmdMap := make(map[string]CustomCommand)
 
 	homeDir, _ := os.UserHomeDir()

@@ -3,7 +3,7 @@ package llm
 import "sync"
 
 // defaultSetup is the package-level LLM setup, initialized by Initialize().
-// External callers should use Default() to get the Service singleton.
+// External callers should use Default() to get the *Hub singleton.
 var defaultSetup = &Setup{}
 
 // Setup holds the initialized LLM provider state needed by the app layer.
@@ -14,11 +14,9 @@ type Setup struct {
 	CurrentModel *CurrentModelInfo
 }
 
-// setSingleton publishes defaultSetup as the singleton Service.
+// setSingleton publishes defaultSetup as the package-level *Hub.
 func setSingleton() {
-	mu.Lock()
-	instance = &service{setup: defaultSetup}
-	mu.Unlock()
+	defaultHub = &Hub{setup: defaultSetup}
 }
 
 // ModelID returns the current model ID, or empty string if none.

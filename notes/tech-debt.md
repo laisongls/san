@@ -10,25 +10,26 @@ This file tracks structural follow-ups that are not tied to a single feature.
 
 ### Code refactors flagged by `docs/packages/*/Known Violations`
 
-- **God `Service` interfaces.** Split per the per-package suggestions:
-  `setting` (14), `agent` (11), `cron` (10), `command` (7),
-  `llm` (8), `task` (8), `tool` (6). Define narrow consumer-defined
-  interfaces alongside the concrete `*service` / `*Registry`; let each
-  call site narrow to what it needs.
-  ~~`mcp` (9 methods)~~ — resolved (`Tools` + `Servers` + `*mcp.Registry`).
-  ~~`hook` (16 methods)~~ — resolved (`Handler` + `*hook.Engine`).
-  ~~`session` (11 methods)~~ — resolved by deleting `Service`, exposing
-  `*session.Setup` directly. No role interface — consumers don't share
-  a narrow common surface.
-  ~~`subagent` (9 methods)~~ — resolved by deleting `Service`,
-  exposing `*subagent.Registry` directly. No role interface — same
-  reason as session.
-  ~~`skill` (11 methods)~~ — resolved by deleting `Service`, exposing
-  `*skill.Registry` directly. No role interface — same reason.
-  ~~`plugin` (21 methods)~~ — resolved by deleting `Service`, exposing
-  `*plugin.Registry` directly + the existing package-level free
-  functions (`GetPlugin*Paths`, `SetActivePluginRoot`, etc.) that the
-  Service methods just wrapped.
+- **God `Service` interfaces.** All resolved.
+  ~~`mcp` (9 methods)~~ — `Tools` + `Servers` + `*mcp.Registry`.
+  ~~`hook` (16 methods)~~ — `Handler` + `*hook.Engine`.
+  ~~`session` (11 methods)~~ — `*session.Setup` direct.
+  ~~`subagent` (9 methods)~~ — `*subagent.Registry` direct.
+  ~~`skill` (11 methods)~~ — `*skill.Registry` direct.
+  ~~`plugin` (21 methods)~~ — `*plugin.Registry` direct + existing
+  package-level free functions.
+  ~~`tool` (6 methods)~~ — `*tool.Registry` direct.
+  ~~`cron` (10 methods)~~ — `*cron.Scheduler` direct (renamed from
+  `*Store`; methods schedule, persistence is a detail).
+  ~~`task` (8 methods)~~ — `*task.Tracker` direct (renamed from
+  `*Manager`; tracks background bash/subagent tasks).
+  ~~`command` (7 methods)~~ — `*command.Registry` direct.
+  ~~`llm` (8 methods)~~ — `*llm.Hub` direct (provider connection center
+  + Client factory). Wraps `*Setup` (Store + Provider + CurrentModel).
+  ~~`agent` (11 methods)~~ — `*agent.Session` direct (foreground agent
+  session lifecycle).
+  ~~`setting` (14 methods)~~ — `*setting.Manager` direct (settings +
+  permission decision gate).
 - **Escape-hatch methods on Service interfaces.** All resolved:
   ~~`MCP.Registry()`~~, ~~`Hook.Engine()`~~, ~~`Session.GetStore()`~~
   / ~~`Session.SetStore()`~~ — Service interfaces deleted in their

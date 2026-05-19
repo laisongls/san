@@ -1,80 +1,34 @@
+// Package agent owns the foreground agent session lifecycle. *Session
+// is the concrete handle; the package exposes it directly.
 package agent
-
-import (
-	"sync"
-
-	"github.com/genai-io/gen-code/internal/core"
-)
-
-// Service manages the main agent session lifecycle.
-type Service interface {
-	// Start builds a core.Agent from params, starts its goroutine.
-	// If messages is non-empty, they are loaded as conversation history.
-	Start(params BuildParams, messages []core.Message) error
-
-	// Stop cancels the agent goroutine and cleans up.
-	Stop()
-
-	// Active reports whether an agent session is running.
-	Active() bool
-
-	// Send pushes a user message to the agent's inbox. No-op if not active.
-	Send(content string, images []core.Image)
-
-	// Outbox returns the agent's event channel. Nil if not active.
-	Outbox() <-chan core.Event
-
-	// PermissionBridge returns the current session's permission bridge.
-	PermissionBridge() *PermissionBridge
-
-	// PendingPermission gets the pending permission request.
-	PendingPermission() *PermBridgeRequest
-
-	// SetPendingPermission tracks a pending permission request for TUI approval.
-	SetPendingPermission(req *PermBridgeRequest)
-
-	// System returns the running agent's system prompt for hot-patching
-	// (e.g. swapping identity mid-session). Returns nil if no agent is
-	// active. Mutations are visible on the next inference call.
-	System() core.System
-}
 
 // Options holds dependencies for initialization.
 type Options struct{}
 
-var _ Service = (*service)(nil)
-
-// ── singleton ──────────────────────────────────────────────
-
-var (
-	mu       sync.RWMutex
-	instance Service
-)
-
+// Initialize installs a fresh *Session as the package-level default.
 func Initialize(opts Options) {
-	mu.Lock()
-	instance = &service{}
-	mu.Unlock()
+	defaultSession = &Session{}
 }
 
-func Default() Service {
-	mu.RLock()
-	s := instance
-	mu.RUnlock()
+// Default returns the package-level *Session.
+func Default() *Session {
+	return defaultSession
+}
+
+// SetDefaultSession replaces the package-level *Session. Intended for
+// tests. A nil argument restores a fresh empty *Session.
+func SetDefaultSession(s *Session) {
 	if s == nil {
-		panic("agent: not initialized")
+		defaultSession = &Session{}
+		return
 	}
-	return s
+	defaultSession = s
 }
 
-func SetDefault(s Service) {
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+// ResetDefaultSession restores a fresh empty *Session. Intended for
+// tests.
+func ResetDefaultSession() {
+	defaultSession = &Session{}
 }
 
-func ResetService() {
-	mu.Lock()
-	instance = nil
-	mu.Unlock()
-}
+var defaultSession = &Session{}

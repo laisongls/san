@@ -10,21 +10,21 @@ import (
 	"time"
 )
 
-// Manager manages background tasks
-type Manager struct {
+// Tracker tracks background bash and subagent tasks.
+type Tracker struct {
 	mu    sync.RWMutex
 	tasks map[string]BackgroundTask
 }
 
-// NewManager creates a new task manager
-func NewManager() *Manager {
-	return &Manager{
+// NewTracker creates a new *Tracker.
+func NewTracker() *Tracker {
+	return &Tracker{
 		tasks: make(map[string]BackgroundTask),
 	}
 }
 
 // CreateBashTask creates and registers a new bash task
-func (m *Manager) CreateBashTask(cmd *exec.Cmd, command, description string, ctx context.Context, cancel context.CancelFunc) *BashTask {
+func (m *Tracker) CreateBashTask(cmd *exec.Cmd, command, description string, ctx context.Context, cancel context.CancelFunc) *BashTask {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -38,7 +38,7 @@ func (m *Manager) CreateBashTask(cmd *exec.Cmd, command, description string, ctx
 }
 
 // RegisterTask registers an existing task (used for agent tasks)
-func (m *Manager) RegisterTask(task BackgroundTask) {
+func (m *Tracker) RegisterTask(task BackgroundTask) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.tasks[task.GetID()] = task
@@ -55,7 +55,7 @@ func generateID() string {
 }
 
 // Get retrieves a task by ID
-func (m *Manager) Get(id string) (BackgroundTask, bool) {
+func (m *Tracker) Get(id string) (BackgroundTask, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	task, ok := m.tasks[id]
@@ -63,7 +63,7 @@ func (m *Manager) Get(id string) (BackgroundTask, bool) {
 }
 
 // getBashTask retrieves a bash task by ID (for backward compatibility)
-func (m *Manager) getBashTask(id string) (*BashTask, bool) {
+func (m *Tracker) getBashTask(id string) (*BashTask, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	task, ok := m.tasks[id]
@@ -75,7 +75,7 @@ func (m *Manager) getBashTask(id string) (*BashTask, bool) {
 }
 
 // List returns all tasks
-func (m *Manager) List() []BackgroundTask {
+func (m *Tracker) List() []BackgroundTask {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -87,7 +87,7 @@ func (m *Manager) List() []BackgroundTask {
 }
 
 // ListRunning returns all running tasks
-func (m *Manager) ListRunning() []BackgroundTask {
+func (m *Tracker) ListRunning() []BackgroundTask {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -101,7 +101,7 @@ func (m *Manager) ListRunning() []BackgroundTask {
 }
 
 // Kill terminates a task by ID
-func (m *Manager) Kill(id string) error {
+func (m *Tracker) Kill(id string) error {
 	m.mu.RLock()
 	task, ok := m.tasks[id]
 	m.mu.RUnlock()
@@ -141,14 +141,14 @@ func (m *Manager) Kill(id string) error {
 }
 
 // Remove removes a completed task from the manager
-func (m *Manager) Remove(id string) {
+func (m *Tracker) Remove(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.tasks, id)
 }
 
 // cleanup removes all completed tasks older than maxAge
-func (m *Manager) cleanup(maxAge time.Duration) {
+func (m *Tracker) cleanup(maxAge time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

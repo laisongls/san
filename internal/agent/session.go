@@ -8,7 +8,7 @@ import (
 	"github.com/genai-io/gen-code/internal/core"
 )
 
-type service struct {
+type Session struct {
 	mu                 sync.RWMutex
 	agent              core.Agent
 	permBridge         *PermissionBridge
@@ -16,7 +16,7 @@ type service struct {
 	pendingPermRequest *PermBridgeRequest
 }
 
-func (s *service) Start(params BuildParams, messages []core.Message) error {
+func (s *Session) Start(params BuildParams, messages []core.Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -42,13 +42,13 @@ func (s *service) Start(params BuildParams, messages []core.Message) error {
 	return nil
 }
 
-func (s *service) Stop() {
+func (s *Session) Stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopLocked()
 }
 
-func (s *service) stopLocked() {
+func (s *Session) stopLocked() {
 	if s.agent == nil {
 		return
 	}
@@ -65,13 +65,13 @@ func (s *service) stopLocked() {
 	s.pendingPermRequest = nil
 }
 
-func (s *service) Active() bool {
+func (s *Session) Active() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.agent != nil
 }
 
-func (s *service) Send(content string, images []core.Image) {
+func (s *Session) Send(content string, images []core.Image) {
 	s.mu.RLock()
 	ag := s.agent
 	s.mu.RUnlock()
@@ -81,7 +81,7 @@ func (s *service) Send(content string, images []core.Image) {
 	ag.Inbox() <- core.Message{Role: core.RoleUser, Content: content, Images: images}
 }
 
-func (s *service) Outbox() <-chan core.Event {
+func (s *Session) Outbox() <-chan core.Event {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.agent == nil {
@@ -90,25 +90,25 @@ func (s *service) Outbox() <-chan core.Event {
 	return s.agent.Outbox()
 }
 
-func (s *service) PermissionBridge() *PermissionBridge {
+func (s *Session) PermissionBridge() *PermissionBridge {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.permBridge
 }
 
-func (s *service) PendingPermission() *PermBridgeRequest {
+func (s *Session) PendingPermission() *PermBridgeRequest {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.pendingPermRequest
 }
 
-func (s *service) SetPendingPermission(req *PermBridgeRequest) {
+func (s *Session) SetPendingPermission(req *PermBridgeRequest) {
 	s.mu.Lock()
 	s.pendingPermRequest = req
 	s.mu.Unlock()
 }
 
-func (s *service) System() core.System {
+func (s *Session) System() core.System {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.agent == nil {

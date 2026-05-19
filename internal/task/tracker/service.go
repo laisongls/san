@@ -29,9 +29,6 @@ type Service interface {
 	Reset()
 }
 
-// Compile-time check: *Store implements Service.
-var _ Service = (*Store)(nil)
-
 // Options holds all dependencies for initialization.
 type Options struct{}
 

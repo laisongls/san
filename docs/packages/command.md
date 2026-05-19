@@ -19,43 +19,29 @@ commands loaded from disk.
 
 ## Contract
 
+Slash command registry. Combines built-in handlers, dynamic providers (skill/agent surfaces), and custom markdown commands. The package exposes `*Registry` directly — no Service interface.
+
 ```go
 package command
 
-// Service is the public contract for the command module.
-type Service interface {
-    Get(name string) (Info, bool)
-    List() []Info
-    ListCustom() []CustomCommand
-    GetMatching(prefix string) []Info
-    IsCustomCommand(cmd string) (*CustomCommand, bool)
-    BuiltinNames() map[string]Info
-    GetCustomCommands() []Info
-}
+// Registry is the opaque handle. Type exported; fields unexported.
+type Registry struct { /* internal fields */ }
 
-type PluginCommandPath struct {
-    Path      string
-    Namespace string
-    IsProject bool
-}
+func (s *Registry) Get(name string) (Info, bool)
+func (s *Registry) List() []Info
+func (s *Registry) ListCustom() []CustomCommand
+func (s *Registry) GetMatching(prefix string) []Info
+func (s *Registry) IsCustomCommand(cmd string) (*CustomCommand, bool)
+func (s *Registry) BuiltinNames() map[string]Info
+func (s *Registry) GetCustomCommands() []Info
 
-type Options struct {
-    CWD                string
-    DynamicProviders   []func() []Info
-    PluginCommandPaths func() []PluginCommandPath
-}
+// Package-level access
+func Initialize(opts Options)
+func Default() *Registry
+func SetDefaultRegistry(s *Registry)  // test-only
+func ResetDefaultRegistry()          // test-only
 ```
 
-### Known Violations
-
-- **Rule 1 (small).** 7 methods on `Service` is at the upper edge.
-  `List` / `BuiltinNames` / `GetCustomCommands` overlap conceptually;
-  could consolidate. Acceptable; the methods all serve the autocompleter.
-- **Rule 5.** `Default()` returns `Service`.
-- **Singleton via `Default()`.**
-
-Otherwise this is one of the cleaner package contracts — the surface is
-narrow and consumer-oriented.
 
 ## Internals
 

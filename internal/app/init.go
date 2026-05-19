@@ -136,7 +136,7 @@ func pluginMCPServers() []mcp.PluginServer {
 	return servers
 }
 
-func commandSuggestionMatcher(cmdSvc command.Service) func(string) []suggest.Suggestion {
+func commandSuggestionMatcher(cmdSvc *command.Registry) func(string) []suggest.Suggestion {
 	return func(query string) []suggest.Suggestion {
 		cmds := cmdSvc.GetMatching(query)
 		result := make([]suggest.Suggestion, len(cmds))

@@ -20,42 +20,30 @@ streaming details for each call.
 
 ## Contract
 
+LLM provider connection handle + Client factory. Wraps the package-level *Setup (Store + Provider + CurrentModel) under a mutex. The package exposes `*Hub` directly — no Service interface.
+
 ```go
 package llm
 
-// Service is the public contract for the llm module.
-type Service interface {
-    // connection
-    Provider() Provider              // current active provider
-    SetProvider(p Provider)          // switch provider
-    ModelID() string                 // current model identifier
-    CurrentModel() *CurrentModelInfo // full model metadata
-    SetCurrentModel(info *CurrentModelInfo)
+// Hub is the opaque handle. Type exported; fields unexported.
+type Hub struct { /* internal fields */ }
 
-    // factory
-    NewClient(model string, maxTokens int) *Client
+func (s *Hub) Provider() Provider
+func (s *Hub) SetProvider(p Provider)
+func (s *Hub) ModelID() string
+func (s *Hub) CurrentModel() *CurrentModelInfo
+func (s *Hub) SetCurrentModel(info *CurrentModelInfo)
+func (s *Hub) NewClient(model string, maxTokens int) *Client
+func (s *Hub) Store() *Store
+func (s *Hub) ListProviders() map[Name][]Info
 
-    // store
-    Store() *Store // underlying provider persistence store
-
-    // registry
-    ListProviders() map[Name][]Info // all registered providers with status
-}
+// Package-level access
+func Initialize(opts Options)
+func Default() *Hub
+func SetDefaultHub(s *Hub)  // test-only
+func ResetDefaultHub()          // test-only
 ```
 
-`Client` implements `core.LLM`. `Provider` is the per-backend handle
-(API key, auth method, list-models endpoint).
-
-### Known Violations
-
-- **Rule 1 (small).** 8 methods. Mixes connection state, factory, store
-  access, and registry listing. Suggested split: `LLMConnection`
-  (Provider/SetProvider/Model methods), `LLMClientFactory` (NewClient),
-  `LLMProviderRegistry` (ListProviders).
-- **Rule 7 (no escape hatch).** `Store()` exposes the concrete `*Store`.
-  Callers should depend on a narrower read-only view.
-- **Rule 5.** `Default()` returns `Service` not `*service`.
-- **Singleton via `Default()`.**
 
 ## Internals
 

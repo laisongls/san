@@ -71,7 +71,7 @@ func TestDescribe(t *testing.T) {
 }
 
 func TestStoreCreateAndList(t *testing.T) {
-	store := NewStore()
+	store := NewScheduler()
 	job, err := store.Create("*/5 * * * *", "test prompt", true, false)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -90,7 +90,7 @@ func TestStoreCreateAndList(t *testing.T) {
 }
 
 func TestStoreDelete(t *testing.T) {
-	store := NewStore()
+	store := NewScheduler()
 	job, _ := store.Create("*/5 * * * *", "to delete", true, false)
 	if err := store.Delete(job.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
@@ -101,7 +101,7 @@ func TestStoreDelete(t *testing.T) {
 }
 
 func TestStoreTick(t *testing.T) {
-	store := NewStore()
+	store := NewScheduler()
 	// Create a one-shot job
 	job, _ := store.Create("* * * * *", "fire me", false, false)
 
@@ -125,7 +125,7 @@ func TestStoreTick(t *testing.T) {
 }
 
 func TestStore_maxJobs(t *testing.T) {
-	store := NewStore()
+	store := NewScheduler()
 	for i := 0; i < maxJobs; i++ {
 		_, err := store.Create("*/5 * * * *", "job", true, false)
 		if err != nil {
@@ -162,7 +162,7 @@ func TestCron_InvalidExpression_ReturnsError(t *testing.T) {
 }
 
 func TestCron_Once_RemovedAfterFiring(t *testing.T) {
-	store := NewStore()
+	store := NewScheduler()
 
 	// Create a non-recurring (one-shot) job
 	job, err := store.Create("* * * * *", "fire once", false, false)
@@ -200,7 +200,7 @@ func TestStoreDurable(t *testing.T) {
 	tmpFile := t.TempDir() + "/scheduled_tasks.json"
 
 	// Create a store with durable job
-	store := NewStore()
+	store := NewScheduler()
 	store.SetStoragePath(tmpFile)
 	job, err := store.Create("*/10 * * * *", "durable prompt", true, true)
 	if err != nil {
@@ -211,7 +211,7 @@ func TestStoreDurable(t *testing.T) {
 	}
 
 	// Load into a fresh store
-	store2 := NewStore()
+	store2 := NewScheduler()
 	store2.SetStoragePath(tmpFile)
 	if err := store2.LoadDurable(); err != nil {
 		t.Fatalf("LoadDurable failed: %v", err)
@@ -230,7 +230,7 @@ func TestStoreDurable(t *testing.T) {
 }
 
 func TestStoreTick_RecurringJobReschedulesAndTracksFireCount(t *testing.T) {
-	store := NewStore()
+	store := NewScheduler()
 	job, err := store.Create("* * * * *", "repeat me", true, false)
 	if err != nil {
 		t.Fatalf("Create recurring job failed: %v", err)
@@ -266,7 +266,7 @@ func TestStoreTick_RecurringJobReschedulesAndTracksFireCount(t *testing.T) {
 func TestStoreDelete_DurableRemovesPersistedJob(t *testing.T) {
 	tmpFile := t.TempDir() + "/scheduled_tasks.json"
 
-	store := NewStore()
+	store := NewScheduler()
 	store.SetStoragePath(tmpFile)
 	job, err := store.Create("*/10 * * * *", "durable prompt", true, true)
 	if err != nil {
@@ -294,7 +294,7 @@ func TestStoreDelete_DurableRemovesPersistedJob(t *testing.T) {
 func TestStoreTick_DurableRecurringPersistsUpdatedState(t *testing.T) {
 	tmpFile := t.TempDir() + "/scheduled_tasks.json"
 
-	store := NewStore()
+	store := NewScheduler()
 	store.SetStoragePath(tmpFile)
 	job, err := store.Create("* * * * *", "durable repeat", true, true)
 	if err != nil {
@@ -372,7 +372,7 @@ func TestComputeNextFire_OneShotDoesNotAddJitter(t *testing.T) {
 func TestLoadDurable_OneShotPastDueFiresOnNextTick(t *testing.T) {
 	tmpFile := t.TempDir() + "/scheduled_tasks.json"
 
-	store := NewStore()
+	store := NewScheduler()
 	store.SetStoragePath(tmpFile)
 	job, err := store.Create("30 9 28 2 *", "missed once", false, true)
 	if err != nil {
@@ -384,7 +384,7 @@ func TestLoadDurable_OneShotPastDueFiresOnNextTick(t *testing.T) {
 	store.saveDurableLocked()
 	store.mu.Unlock()
 
-	store2 := NewStore()
+	store2 := NewScheduler()
 	store2.SetStoragePath(tmpFile)
 	if err := store2.LoadDurable(); err != nil {
 		t.Fatalf("LoadDurable failed: %v", err)

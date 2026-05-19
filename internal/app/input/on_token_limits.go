@@ -22,7 +22,7 @@ type TokenLimitDeps struct {
 	InputTokens  int
 	Cwd          string
 	SpinnerTick  tea.Cmd
-	ToolSvc      tool.Service
+	ToolSvc      *tool.Registry
 }
 
 // HandleTokenLimitCommand processes the /tokenlimit slash command.
@@ -97,7 +97,7 @@ type autoFetchTokenLimitsDeps struct {
 	Store        *llm.Store
 	CurrentModel *llm.CurrentModelInfo
 	Cwd          string
-	ToolSvc      tool.Service
+	ToolSvc      *tool.Registry
 }
 
 func autoFetchTokenLimits(ctx context.Context, deps autoFetchTokenLimitsDeps) (string, error) {
@@ -203,7 +203,7 @@ func getTokenLimitAgentTools() []llm.ToolSchema {
 	}
 }
 
-func appendToolCallMessages(ctx context.Context, messages []core.Message, toolCalls []core.ToolCall, cwd string, toolSvc tool.Service) []core.Message {
+func appendToolCallMessages(ctx context.Context, messages []core.Message, toolCalls []core.ToolCall, cwd string, toolSvc *tool.Registry) []core.Message {
 	messages = append(messages, core.AssistantMessage("", "", toolCalls))
 
 	for _, tc := range toolCalls {

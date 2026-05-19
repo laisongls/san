@@ -36,14 +36,14 @@ type SearchSelector struct {
 	width       int
 	height      int
 	store       *llm.Store
-	settingSvc  setting.Service
+	settingSvc  *setting.Manager
 
 	apiKeyActive bool
 	apiKeyEnvVar string
 	apiKeyInput  textinput.Model
 }
 
-func NewSearchSelector(settingSvc setting.Service) SearchSelector {
+func NewSearchSelector(settingSvc *setting.Manager) SearchSelector {
 	return SearchSelector{settingSvc: settingSvc}
 }
 

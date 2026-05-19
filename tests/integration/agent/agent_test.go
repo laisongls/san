@@ -270,7 +270,7 @@ func TestAgent_SubagentHooks_Fire(t *testing.T) {
 
 func TestAgent_BackgroundExecution(t *testing.T) {
 	task.Initialize(task.Options{})
-	t.Cleanup(task.ResetService)
+	t.Cleanup(task.ResetDefaultTracker)
 
 	mp := &testutil.MockProvider{
 		Responses: []llm.CompletionResponse{

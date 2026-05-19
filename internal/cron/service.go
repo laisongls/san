@@ -1,76 +1,39 @@
+// Package cron schedules recurring and one-shot jobs that fire user
+// prompts back into the agent loop. Exposes *Scheduler directly.
 package cron
 
-import "sync"
-
-// Service is the public contract for the cron module.
-type Service interface {
-	// CRUD
-	Add(job Job) error
-	Remove(id string) bool
-	Create(cronExpr, prompt string, recurring, durable bool) (*Job, error)
-	Delete(id string) error
-	List() []*Job
-
-	// runtime
-	Tick() []FiredJob // advance clock, return fired jobs
-
-	// query
-	Empty() bool
-
-	// lifecycle
-	Reset()
-	SetStoragePath(path string)
-	LoadDurable() error
-}
-
-// Compile-time check: *Store implements Service.
-var _ Service = (*Store)(nil)
-
-// ── singleton ──────────────────────────────────────────────
-
-var (
-	mu       sync.RWMutex
-	instance Service
-)
-
-// Options configures the cron service singleton.
+// Options configures the package-level *Scheduler.
 type Options struct {
 	StoragePath string // file path for durable job persistence
 }
 
-// Initialize creates and configures the cron service singleton.
+// Initialize creates and configures the package-level *Scheduler.
 func Initialize(opts Options) {
-	s := NewStore()
+	s := NewScheduler()
 	if opts.StoragePath != "" {
 		s.SetStoragePath(opts.StoragePath)
 	}
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+	defaultScheduler = s
 }
 
-// Default returns the singleton Service instance.
-// Panics if not initialized.
-func Default() Service {
-	mu.RLock()
-	s := instance
-	mu.RUnlock()
+// Default returns the package-level *Scheduler.
+func Default() *Scheduler {
+	return defaultScheduler
+}
+
+// SetDefaultScheduler replaces the package-level *Scheduler. Intended for tests.
+// A nil argument restores a fresh empty *Scheduler.
+func SetDefaultScheduler(s *Scheduler) {
 	if s == nil {
-		panic("cron: not initialized")
+		defaultScheduler = NewScheduler()
+		return
 	}
-	return s
+	defaultScheduler = s
 }
 
-// SetDefault sets the singleton Service instance (for tests).
-func SetDefault(s Service) {
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+// ResetDefaultScheduler restores a fresh empty *Scheduler. Intended for tests.
+func ResetDefaultScheduler() {
+	defaultScheduler = NewScheduler()
 }
 
-// ResetService clears the singleton (for tests).
-func ResetService() {
-	mu.Lock()
-	instance = nil
-	mu.Unlock()
-}
+var defaultScheduler = NewScheduler()

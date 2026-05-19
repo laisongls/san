@@ -1,82 +1,46 @@
+// Package task tracks background bash and subagent tasks for the TUI's
+// task panel and the agent's TaskOutput / TaskList tools. Exposes
+// *Tracker directly.
 package task
-
-import (
-	"context"
-	"os/exec"
-	"sync"
-)
-
-// Service is the public contract for the task module.
-type Service interface {
-	// lifecycle
-	RegisterTask(t BackgroundTask)
-	CreateBashTask(cmd *exec.Cmd, command, description string, ctx context.Context, cancel context.CancelFunc) *BashTask
-	Get(id string) (BackgroundTask, bool)
-	List() []BackgroundTask
-	ListRunning() []BackgroundTask
-	Kill(id string) error
-	Remove(id string)
-
-	// output
-	SetOutputDir(dir string) error
-}
-
-// Compile-time check: *Manager implements Service.
-var _ Service = (*Manager)(nil)
 
 // Options holds all dependencies for initialization.
 type Options struct {
 	OutputDir string
 }
 
-// ── singleton ──────────────────────────────────────────────
-
-var (
-	mu       sync.RWMutex
-	instance Service
-)
-
-// Initialize creates a new Manager, applies options, and sets the singleton.
+// Initialize creates the package-level *Tracker and configures it.
 func Initialize(opts Options) {
-	m := NewManager()
+	m := NewTracker()
 	if opts.OutputDir != "" {
 		m.SetOutputDir(opts.OutputDir)
 	}
-	mu.Lock()
-	instance = m
-	mu.Unlock()
+	defaultTracker = m
 }
 
-// Default returns the singleton Service instance.
-// Panics if not initialized.
-func Default() Service {
-	mu.RLock()
-	s := instance
-	mu.RUnlock()
-	if s == nil {
-		panic("task: not initialized")
+// Default returns the package-level *Tracker.
+func Default() *Tracker {
+	return defaultTracker
+}
+
+// SetDefaultTracker replaces the package-level *Tracker. Intended for
+// tests. A nil argument restores a fresh empty *Tracker.
+func SetDefaultTracker(m *Tracker) {
+	if m == nil {
+		defaultTracker = NewTracker()
+		return
 	}
-	return s
+	defaultTracker = m
 }
 
-// SetDefault replaces the singleton instance. Intended for tests.
-func SetDefault(s Service) {
-	mu.Lock()
-	instance = s
-	mu.Unlock()
+// ResetDefaultTracker restores a fresh empty *Tracker. Intended for
+// tests.
+func ResetDefaultTracker() {
+	defaultTracker = NewTracker()
 }
 
-// ResetService clears the singleton instance. Intended for tests.
-func ResetService() {
-	mu.Lock()
-	instance = nil
-	mu.Unlock()
-}
+var defaultTracker = NewTracker()
 
-// ── Service methods on Manager ─────────────────────────────
-
-// SetOutputDir implements Service by delegating to the package-level
-// SetOutputDir function.
-func (m *Manager) SetOutputDir(dir string) error {
+// SetOutputDir on *Tracker delegates to the package-level setOutputDir.
+func (m *Tracker) SetOutputDir(dir string) error {
 	return setOutputDir(dir)
 }

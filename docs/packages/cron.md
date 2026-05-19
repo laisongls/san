@@ -17,47 +17,36 @@ non-durable jobs are in-memory only.
 
 ## Contract
 
+Cron expression scheduler. Jobs persist to disk when marked durable; the TUI loop calls Tick() to fire due jobs. The package exposes `*Scheduler` directly — no Service interface.
+
 ```go
 package cron
 
-// Service is the public contract for the cron module.
-type Service interface {
-    // CRUD
-    Add(job Job) error
-    Remove(id string) bool
-    Create(cronExpr, prompt string, recurring, durable bool) (*Job, error)
-    Delete(id string) error
-    List() []*Job
+// Scheduler is the opaque handle. Type exported; fields unexported.
+type Scheduler struct { /* internal fields */ }
 
-    // runtime
-    Tick() []FiredJob
+func (s *Scheduler) Add(job Job) error
+func (s *Scheduler) Remove(id string) bool
+func (s *Scheduler) Create(cronExpr, prompt string, recurring, durable bool) (*Job, error)
+func (s *Scheduler) Delete(id string) error
+func (s *Scheduler) List() []*Job
+func (s *Scheduler) Tick() []FiredJob
+func (s *Scheduler) Empty() bool
+func (s *Scheduler) Reset()
+func (s *Scheduler) SetStoragePath(path string)
+func (s *Scheduler) LoadDurable() error
 
-    // query
-    Empty() bool
-
-    // lifecycle
-    Reset()
-    SetStoragePath(path string)
-    LoadDurable() error
-}
+// Package-level access
+func Initialize(opts Options)
+func Default() *Scheduler
+func SetDefaultScheduler(s *Scheduler)  // test-only
+func ResetDefaultScheduler()        // test-only
 ```
 
-### Known Violations
-
-- **Rule 1 (small).** 10 methods spanning CRUD, runtime tick, and
-  lifecycle. Could split into `CronJobs` (CRUD/Query) and `CronRuntime`
-  (Tick/Lifecycle).
-- **`Add` and `Create` overlap.** Both produce a `Job` from input. `Add`
-  takes a built `Job`; `Create` takes raw fields. The two-API surface
-  invites confusion — pick one.
-- **`Remove` returns bool, `Delete` returns error.** Different idioms
-  for the same operation. Consolidate.
-- **Rule 5.** `Default()` returns `Service`.
-- **Singleton via `Default()`.**
 
 ## Internals
 
-- `Store` (`store.go`) — concrete implementation. Holds the job map +
+- `Scheduler` (`store.go`) — concrete implementation. Holds the job map +
   optional `storagePath` for durable persistence.
 - `cron.go` — `Job` struct, cron expression parsing, next-fire-time
   calculation.
