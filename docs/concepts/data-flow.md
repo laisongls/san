@@ -133,26 +133,45 @@ routeKeypress → handleTextareaShortcut
         Step 4: slash command? ───► no (no leading "/")
         Step 5: send to agent
                   ├─ plugin.ClearActivePluginRoot()
-                  │     If a previous /plugin command set an "active
-                  │     plugin scope" (so its skills/agents resolve
-                  │     locally), normal user turns clear it — this
-                  │     prompt is the user's, not the plugin's.
+                  │     Plugins (a plugin = a directory of skills /
+                  │     agents / hooks / MCP servers) export a
+                  │     PLUGIN_ROOT env var so their hook scripts and
+                  │     spawned tools can find sibling files. When a
+                  │     plugin's slash command or skill runs, it sets
+                  │     activePluginRoot to that plugin's path so
+                  │     PLUGIN_ROOT points there for the duration.
+                  │     A new user-typed prompt is not running on
+                  │     behalf of any plugin, so we clear the var
+                  │     before kicking off this turn — otherwise the
+                  │     last plugin's PLUGIN_ROOT would leak into the
+                  │     hooks fired by this turn.
                   │
                   ├─ buildUserMessage("hello") → ChatMessage{Role: user}
                   │     Resolves image refs (`[image.png]` → bytes) and
                   │     splits inline-pasted images out of the text.
                   │
                   ├─ conv.Append(msg)
-                  │     Appends to m.conv.Messages. Two consumers:
-                  │       1. View() renders this slice as scrollback.
-                  │       2. Agent reads it via ConvertToProvider() when
-                  │          building the next LLM request.
+                  │     Appends to m.conv.Messages. This is the TUI's
+                  │     own display copy — View() renders it as
+                  │     scrollback, and PersistSession writes it to
+                  │     disk. The agent does NOT read this slice on
+                  │     every send; it keeps its own internal message
+                  │     history. The two stay in sync via events
+                  │     (see Path D). conv.Append is read-only by the
+                  │     agent in one case only: ensureAgentSession
+                  │     uses it to seed a freshly-started agent.
                   │
                   ├─ userInput.Reset()
                   │     Clears textarea + pending images so the user can
                   │     start the next message.
                   │
                   └─ SubmitToAgent(msg.Content, msg.Images)
+                        Pushes `msg` onto the agent's INBOX (a separate
+                        Go channel). The agent's own loop will read it,
+                        append it to its internal history, then call the
+                        LLM. That's why both calls are needed:
+                          conv.Append(msg)  → makes the user SEE it
+                          SubmitToAgent     → makes the agent ACT on it
                         │
                         ▼
    SubmitToAgent
