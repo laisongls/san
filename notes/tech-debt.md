@@ -24,12 +24,14 @@ This file tracks structural follow-ups that are not tied to a single feature.
   ~~`task` (8 methods)~~ — `*task.Tracker` direct (renamed from
   `*Manager`; tracks background bash/subagent tasks).
   ~~`command` (7 methods)~~ — `*command.Registry` direct.
-  ~~`llm` (8 methods)~~ — `*llm.Hub` direct (provider connection center
-  + Client factory). Wraps `*Setup` (Store + Provider + CurrentModel).
-  ~~`agent` (11 methods)~~ — `*agent.Session` direct (foreground agent
-  session lifecycle).
-  ~~`setting` (14 methods)~~ — `*setting.Manager` direct (settings +
-  permission decision gate).
+  ~~`llm` (8 methods)~~ — `*llm.ClientFactory` direct (active
+  provider/model handle + `*Client` factory). Wraps `*Setup`
+  (Store + Provider + CurrentModel).
+  ~~`agent` (11 methods)~~ — `*agent.Task` direct (foreground agent
+  task lifecycle).
+  ~~`setting` (14 methods)~~ — `*setting.Settings` direct (live,
+  mutex-protected handle over `*setting.Data`; also the permission
+  decision gate).
 - **Escape-hatch methods on Service interfaces.** All resolved:
   ~~`MCP.Registry()`~~, ~~`Hook.Engine()`~~, ~~`Session.GetStore()`~~
   / ~~`Session.SetStore()`~~ — Service interfaces deleted in their

@@ -23,8 +23,8 @@ import (
 // model at construction time. Model methods access services through this
 // struct instead of calling Default() package-level accessors directly.
 type services struct {
-	Setting  *setting.Manager
-	LLM      *llm.Hub
+	Setting  *setting.Settings
+	LLM      *llm.ClientFactory
 	Tool     *tool.Registry
 	Hook     *hook.Engine
 	Session  *session.Setup
@@ -36,7 +36,7 @@ type services struct {
 	Cron     *cron.Scheduler
 	MCP      *mcp.Registry
 	Plugin   *plugin.Registry
-	Agent    *agent.Session
+	Agent    *agent.Task
 	Identity *identity.Registry
 	Reminder *reminder.Service
 }

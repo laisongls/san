@@ -21,29 +21,29 @@ same `Send` path used by user input.
 
 ## Contract
 
-Foreground agent session lifecycle. Holds the single core.Agent + permission bridge for the TUI session. The package exposes `*Session` directly — no Service interface.
+Foreground agent task lifecycle. Holds the single core.Agent + permission bridge for the running task. The package exposes `*Task` directly — no Service interface.
 
 ```go
 package agent
 
-// Session is the opaque handle. Type exported; fields unexported.
-type Session struct { /* internal fields */ }
+// Task is the opaque handle. Type exported; fields unexported.
+type Task struct { /* internal fields */ }
 
-func (s *Session) Start(params BuildParams, messages []core.Message) error
-func (s *Session) Stop()
-func (s *Session) Active() bool
-func (s *Session) Send(content string, images []core.Image)
-func (s *Session) Outbox() <-chan core.Event
-func (s *Session) PermissionBridge() *PermissionBridge
-func (s *Session) PendingPermission() *PermBridgeRequest
-func (s *Session) SetPendingPermission(req *PermBridgeRequest)
-func (s *Session) System() core.System
+func (s *Task) Start(params BuildParams, messages []core.Message) error
+func (s *Task) Stop()
+func (s *Task) Active() bool
+func (s *Task) Send(content string, images []core.Image)
+func (s *Task) Outbox() <-chan core.Event
+func (s *Task) PermissionBridge() *PermissionBridge
+func (s *Task) PendingPermission() *PermBridgeRequest
+func (s *Task) SetPendingPermission(req *PermBridgeRequest)
+func (s *Task) System() core.System
 
 // Package-level access
 func Initialize(opts Options)
-func Default() *Session
-func SetDefaultSession(s *Session)  // test-only
-func ResetDefaultSession()          // test-only
+func Default() *Task
+func SetDefaultTask(s *Task)  // test-only
+func ResetDefaultTask()          // test-only
 ```
 
 

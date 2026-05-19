@@ -14,7 +14,7 @@ func TestHooks_BlockToolCall(t *testing.T) {
 		t.Skip("skipping on windows (no sh)")
 	}
 
-	settings := &setting.Settings{
+	settings := &setting.Data{
 		Hooks: map[string][]setting.Hook{
 			"PreToolUse": {
 				{
@@ -50,7 +50,7 @@ func TestHooks_ModifyToolInput(t *testing.T) {
 		t.Skip("skipping on windows (no sh)")
 	}
 
-	settings := &setting.Settings{
+	settings := &setting.Data{
 		Hooks: map[string][]setting.Hook{
 			"PreToolUse": {
 				{
@@ -86,7 +86,7 @@ func TestHooks_ModifyToolInput(t *testing.T) {
 
 func TestHooks_NoHooks_PassThrough(t *testing.T) {
 	// No hooks configured
-	engine := hook.NewEngine(&setting.Settings{}, "test-session", t.TempDir(), "")
+	engine := hook.NewEngine(&setting.Data{}, "test-session", t.TempDir(), "")
 
 	input := hook.HookInput{
 		ToolName:  "Read",
@@ -118,7 +118,7 @@ func TestHooks_NilSettings(t *testing.T) {
 }
 
 func TestHooks_HasHooks(t *testing.T) {
-	settings := &setting.Settings{
+	settings := &setting.Data{
 		Hooks: map[string][]setting.Hook{
 			"PreToolUse": {
 				{Hooks: []setting.HookCmd{{Command: "echo ok"}}},

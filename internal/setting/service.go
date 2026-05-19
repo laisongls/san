@@ -1,5 +1,10 @@
 // Package setting owns the merged user+project settings and the
-// central permission decision gate. Exposes *Manager directly.
+// central permission decision gate. Exposes *Settings directly.
+//
+// *Settings is the live, mutex-protected handle (controller). *Data is
+// the on-disk schema (struct with the actual setting fields). The
+// controller wraps a *Data under a mutex and exposes mutex-protected
+// views.
 package setting
 
 import "sync"
@@ -9,163 +14,163 @@ type Options struct {
 	CWD string
 }
 
-// Initialize loads settings for cwd and installs the package-level *Manager.
+// Initialize loads settings for cwd and installs the package-level *Settings.
 func Initialize(opts Options) {
-	s := InitForApp(opts.CWD)
-	defaultManager = &Manager{settings: s}
+	d := InitForApp(opts.CWD)
+	defaultSettings = &Settings{data: d}
 }
 
-// Default returns the package-level *Manager.
-func Default() *Manager {
-	return defaultManager
+// Default returns the package-level *Settings.
+func Default() *Settings {
+	return defaultSettings
 }
 
-// DefaultIfInit returns the package-level *Manager, or nil if it
+// DefaultIfInit returns the package-level *Settings, or nil if it
 // has not been initialized with real settings yet.
-func DefaultIfInit() *Manager {
-	if defaultManager == nil || defaultManager.settings == nil {
+func DefaultIfInit() *Settings {
+	if defaultSettings == nil || defaultSettings.data == nil {
 		return nil
 	}
-	return defaultManager
+	return defaultSettings
 }
 
-// SetDefaultManager replaces the package-level *Manager. Intended for
-// tests. A nil argument restores a fresh empty *Manager.
-func SetDefaultManager(s *Manager) {
+// SetDefaultSettings replaces the package-level *Settings. Intended for
+// tests. A nil argument restores a fresh empty *Settings.
+func SetDefaultSettings(s *Settings) {
 	if s == nil {
-		defaultManager = &Manager{}
+		defaultSettings = &Settings{}
 		return
 	}
-	defaultManager = s
+	defaultSettings = s
 }
 
-// ResetDefaultManager restores a fresh empty *Manager. Intended for
+// ResetDefaultSettings restores a fresh empty *Settings. Intended for
 // tests.
-func ResetDefaultManager() {
-	defaultManager = &Manager{}
+func ResetDefaultSettings() {
+	defaultSettings = &Settings{}
 }
 
-var defaultManager = &Manager{}
+var defaultSettings = &Settings{}
 
-// Manager wraps a *Settings under a mutex. Methods are mutex-protected
-// views over the underlying settings.
-type Manager struct {
-	mu       sync.RWMutex
-	settings *Settings
+// Settings is the live handle: a *Data under a mutex. Methods are
+// mutex-protected views over the underlying *Data.
+type Settings struct {
+	mu   sync.RWMutex
+	data *Data
 }
 
-func (s *Manager) Snapshot() *Settings {
+func (s *Settings) Snapshot() *Data {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.settings.Clone()
+	return s.data.Clone()
 }
 
-func (s *Manager) AllowBypass() bool {
+func (s *Settings) AllowBypass() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.settings != nil && s.settings.AllowBypass != nil && *s.settings.AllowBypass
+	return s.data != nil && s.data.AllowBypass != nil && *s.data.AllowBypass
 }
 
-func (s *Manager) IsGitRepo(cwd string) bool {
+func (s *Settings) IsGitRepo(cwd string) bool {
 	return IsGitRepo(cwd)
 }
 
-func (s *Manager) Reload(cwd string) error {
+func (s *Settings) Reload(cwd string) error {
 	var (
-		newSettings *Settings
-		err         error
+		newData *Data
+		err     error
 	)
 	if cwd != "" {
-		newSettings, err = LoadForCwd(cwd)
+		newData, err = LoadForCwd(cwd)
 	} else {
-		newSettings, err = Load()
+		newData, err = Load()
 	}
 	if err != nil {
 		return err
 	}
-	if newSettings == nil {
-		newSettings = NewSettings()
+	if newData == nil {
+		newData = NewData()
 	}
-	mergeProviderPreferences(newSettings)
-	cloned := newSettings.Clone()
+	mergeProviderPreferences(newData)
+	cloned := newData.Clone()
 
 	s.mu.Lock()
-	s.settings = cloned
+	s.data = cloned
 	s.mu.Unlock()
 
 	return nil
 }
 
-func (s *Manager) DisabledTools() map[string]bool {
+func (s *Settings) DisabledTools() map[string]bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.settings == nil || s.settings.DisabledTools == nil {
+	if s.data == nil || s.data.DisabledTools == nil {
 		return make(map[string]bool)
 	}
-	result := make(map[string]bool, len(s.settings.DisabledTools))
-	for k, v := range s.settings.DisabledTools {
+	result := make(map[string]bool, len(s.data.DisabledTools))
+	for k, v := range s.data.DisabledTools {
 		result[k] = v
 	}
 	return result
 }
 
-func (s *Manager) SearchProvider() string {
+func (s *Settings) SearchProvider() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.settings == nil {
+	if s.data == nil {
 		return ""
 	}
-	return s.settings.SearchProvider
+	return s.data.SearchProvider
 }
 
-func (s *Manager) SetSearchProvider(provider string) {
+func (s *Settings) SetSearchProvider(provider string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.settings != nil {
-		s.settings.SearchProvider = provider
+	if s.data != nil {
+		s.data.SearchProvider = provider
 	}
 }
 
-func (s *Manager) Hooks() map[string][]Hook {
+func (s *Settings) Hooks() map[string][]Hook {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.settings == nil {
+	if s.data == nil {
 		return nil
 	}
-	return s.settings.Hooks
+	return s.data.Hooks
 }
 
-func (s *Manager) CheckPermission(toolName string, args map[string]any, session *SessionPermissions) PermissionBehavior {
+func (s *Settings) CheckPermission(toolName string, args map[string]any, session *SessionPermissions) PermissionBehavior {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.settings == nil {
+	if s.data == nil {
 		return Ask
 	}
-	return s.settings.CheckPermission(toolName, args, session)
+	return s.data.CheckPermission(toolName, args, session)
 }
 
-func (s *Manager) HasPermissionToUseTool(toolName string, args map[string]any, session *SessionPermissions) PermissionDecision {
+func (s *Settings) HasPermissionToUseTool(toolName string, args map[string]any, session *SessionPermissions) PermissionDecision {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.settings == nil {
+	if s.data == nil {
 		return decide(Ask, "default: no settings loaded")
 	}
-	return s.settings.HasPermissionToUseTool(toolName, args, session)
+	return s.data.HasPermissionToUseTool(toolName, args, session)
 }
 
-func (s *Manager) ResolveHookAllow(toolName string, args map[string]any, session *SessionPermissions) bool {
+func (s *Settings) ResolveHookAllow(toolName string, args map[string]any, session *SessionPermissions) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.settings == nil {
+	if s.data == nil {
 		return true
 	}
-	return s.settings.ResolveHookAllow(toolName, args, session)
+	return s.data.ResolveHookAllow(toolName, args, session)
 }
 
-func (s *Manager) GetDisabledToolsAt(userLevel bool) map[string]bool {
+func (s *Settings) GetDisabledToolsAt(userLevel bool) map[string]bool {
 	return GetDisabledToolsAt(userLevel)
 }
 
-func (s *Manager) UpdateDisabledToolsAt(disabledTools map[string]bool, userLevel bool) error {
+func (s *Settings) UpdateDisabledToolsAt(disabledTools map[string]bool, userLevel bool) error {
 	return UpdateDisabledToolsAt(disabledTools, userLevel)
 }

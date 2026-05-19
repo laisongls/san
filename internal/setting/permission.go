@@ -92,7 +92,7 @@ func decide(b PermissionBehavior, reason string) PermissionDecision {
 
 // HasPermissionToUseTool is the central permission gate that determines
 // whether a tool invocation should be allowed, denied, or prompted.
-func (s *Settings) HasPermissionToUseTool(toolName string, args map[string]any, session *SessionPermissions) PermissionDecision {
+func (s *Data) HasPermissionToUseTool(toolName string, args map[string]any, session *SessionPermissions) PermissionDecision {
 	rule := BuildRule(toolName, args)
 
 	// ── Step 1: Deny rules ──
@@ -138,7 +138,7 @@ func (s *Settings) HasPermissionToUseTool(toolName string, args map[string]any, 
 	return coerceAsk(modeDefaultDecision(toolName, session), session)
 }
 
-func (s *Settings) bypassImmunePromptReason(toolName string, args map[string]any, session *SessionPermissions) string {
+func (s *Data) bypassImmunePromptReason(toolName string, args map[string]any, session *SessionPermissions) string {
 	if reason := BypassImmuneReason(toolName, args); reason != "" {
 		return "bypass-immune: " + reason
 	}
@@ -195,7 +195,7 @@ func coerceAsk(decision PermissionDecision, session *SessionPermissions) Permiss
 // Returns false if a deny rule, bypass-immune safety check, or explicit ask
 // rule overrides the hook's decision. This implements the safety invariant:
 // deny rules > bypass-immune checks > ask rules > hook allow.
-func (s *Settings) ResolveHookAllow(toolName string, args map[string]any, session *SessionPermissions) bool {
+func (s *Data) ResolveHookAllow(toolName string, args map[string]any, session *SessionPermissions) bool {
 	rule := BuildRule(toolName, args)
 	for _, pattern := range s.Permissions.Deny {
 		if MatchesToolPattern(toolName, args, rule, pattern) {
@@ -214,7 +214,7 @@ func (s *Settings) ResolveHookAllow(toolName string, args map[string]any, sessio
 }
 
 // CheckPermission is a convenience wrapper returning just the behavior.
-func (s *Settings) CheckPermission(toolName string, args map[string]any, session *SessionPermissions) PermissionBehavior {
+func (s *Data) CheckPermission(toolName string, args map[string]any, session *SessionPermissions) PermissionBehavior {
 	return s.HasPermissionToUseTool(toolName, args, session).Behavior
 }
 

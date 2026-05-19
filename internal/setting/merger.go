@@ -2,9 +2,9 @@ package setting
 
 import "maps"
 
-// mergeSettings merges two Settings, with overlay taking precedence over base.
+// mergeSettings merges two Data, with overlay taking precedence over base.
 // Slices (permission rules) are deduplicated unions. Maps are merged with overlay winning on conflicts.
-func mergeSettings(base, overlay *Settings) *Settings {
+func mergeSettings(base, overlay *Data) *Data {
 	if base == nil {
 		return overlay
 	}
@@ -12,7 +12,7 @@ func mergeSettings(base, overlay *Settings) *Settings {
 		return base
 	}
 
-	result := NewSettings()
+	result := NewData()
 	result.Permissions = mergePermissions(base.Permissions, overlay.Permissions)
 	result.Model = coalesce(overlay.Model, base.Model)
 	result.Theme = coalesce(overlay.Theme, base.Theme)

@@ -20,28 +20,28 @@ streaming details for each call.
 
 ## Contract
 
-LLM provider connection handle + Client factory. Wraps the package-level *Setup (Store + Provider + CurrentModel) under a mutex. The package exposes `*Hub` directly — no Service interface.
+Active LLM provider/model handle and `*Client` factory. Wraps the package-level *Setup (Store + Provider + CurrentModel) under a mutex. The package exposes `*ClientFactory` directly — no Service interface.
 
 ```go
 package llm
 
-// Hub is the opaque handle. Type exported; fields unexported.
-type Hub struct { /* internal fields */ }
+// ClientFactory is the opaque handle. Type exported; fields unexported.
+type ClientFactory struct { /* internal fields */ }
 
-func (s *Hub) Provider() Provider
-func (s *Hub) SetProvider(p Provider)
-func (s *Hub) ModelID() string
-func (s *Hub) CurrentModel() *CurrentModelInfo
-func (s *Hub) SetCurrentModel(info *CurrentModelInfo)
-func (s *Hub) NewClient(model string, maxTokens int) *Client
-func (s *Hub) Store() *Store
-func (s *Hub) ListProviders() map[Name][]Info
+func (s *ClientFactory) Provider() Provider
+func (s *ClientFactory) SetProvider(p Provider)
+func (s *ClientFactory) ModelID() string
+func (s *ClientFactory) CurrentModel() *CurrentModelInfo
+func (s *ClientFactory) SetCurrentModel(info *CurrentModelInfo)
+func (s *ClientFactory) NewClient(model string, maxTokens int) *Client
+func (s *ClientFactory) Store() *Store
+func (s *ClientFactory) ListProviders() map[Name][]Info
 
 // Package-level access
 func Initialize(opts Options)
-func Default() *Hub
-func SetDefaultHub(s *Hub)  // test-only
-func ResetDefaultHub()          // test-only
+func Default() *ClientFactory
+func SetDefaultClientFactory(s *ClientFactory)  // test-only
+func ResetDefaultClientFactory()          // test-only
 ```
 
 

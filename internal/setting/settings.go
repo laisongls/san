@@ -1,5 +1,5 @@
 // Package config provides multi-level settings management for GenCode.
-// Settings are loaded from multiple sources with the following priority (lowest to highest):
+// Data are loaded from multiple sources with the following priority (lowest to highest):
 //  1. ~/.claude/settings.json (Claude user level - compatibility)
 //  2. ~/.gen/settings.json (Gen user level)
 //  3. .claude/settings.json (Claude project level - compatibility)
@@ -18,8 +18,8 @@ import (
 	"strings"
 )
 
-// Settings represents the complete GenCode configuration.
-type Settings struct {
+// Data represents the complete GenCode configuration.
+type Data struct {
 	Permissions    PermissionSettings `json:"permissions,omitempty"`
 	Model          string             `json:"model,omitempty"`
 	Hooks          map[string][]Hook  `json:"hooks,omitempty"`
@@ -210,8 +210,8 @@ func (m OperationMode) NextWithBypass(enabled bool) OperationMode {
 	return ModeNormal
 }
 
-func NewSettings() *Settings {
-	return &Settings{
+func NewData() *Data {
+	return &Data{
 		Hooks:          make(map[string][]Hook),
 		Env:            make(map[string]string),
 		EnabledPlugins: make(map[string]bool),
@@ -222,10 +222,10 @@ func NewSettings() *Settings {
 // InitForApp loads settings for cwd, deep-clones them, and returns
 // an isolated copy safe for mutation by the app layer.
 // It also merges external provider preferences (e.g., search provider
-// from providers.json) into the unified Settings struct.
-func InitForApp(cwd string) *Settings {
+// from providers.json) into the unified Data struct.
+func InitForApp(cwd string) *Data {
 	var (
-		settings *Settings
+		settings *Data
 		err      error
 	)
 	if cwd != "" {
@@ -235,17 +235,17 @@ func InitForApp(cwd string) *Settings {
 	}
 	_ = err
 	if settings == nil {
-		settings = defaultSettings()
+		settings = defaultData()
 	}
 	mergeProviderPreferences(settings)
 	return settings.Clone()
 }
 
 // mergeProviderPreferences reads external provider config files and merges
-// relevant preferences into Settings. Currently reads searchProvider from
+// relevant preferences into Data. Currently reads searchProvider from
 // ~/.gen/providers.json (owned by the llm package) so that search config
-// is accessible via the unified Settings struct.
-func mergeProviderPreferences(s *Settings) {
+// is accessible via the unified Data struct.
+func mergeProviderPreferences(s *Data) {
 	if s.SearchProvider != "" {
 		return
 	}
@@ -265,12 +265,12 @@ func mergeProviderPreferences(s *Settings) {
 	}
 }
 
-// Clone returns a deep copy of the Settings.
-func (s *Settings) Clone() *Settings {
+// Clone returns a deep copy of the Data.
+func (s *Data) Clone() *Data {
 	if s == nil {
-		return defaultSettings()
+		return defaultData()
 	}
-	dst := NewSettings()
+	dst := NewData()
 	dst.Permissions.DefaultMode = s.Permissions.DefaultMode
 	dst.Permissions.Allow = append([]string(nil), s.Permissions.Allow...)
 	dst.Permissions.Deny = append([]string(nil), s.Permissions.Deny...)

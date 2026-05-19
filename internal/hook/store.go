@@ -105,7 +105,7 @@ func (s *hookStore) ClearSessionHooks() {
 	s.executedOnce = make(map[string]struct{})
 }
 
-func (s *hookStore) CollectHooks(event EventType, settings *setting.Settings) []hookSource {
+func (s *hookStore) CollectHooks(event EventType, settings *setting.Data) []hookSource {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -170,7 +170,7 @@ func (s *hookStore) CheckOnce(key string) bool {
 	return true
 }
 
-func (s *hookStore) HasHooks(event EventType, settings *setting.Settings) bool {
+func (s *hookStore) HasHooks(event EventType, settings *setting.Data) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

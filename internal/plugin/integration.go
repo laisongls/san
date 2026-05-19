@@ -71,7 +71,7 @@ func GetPluginHooks() map[string][]setting.Hook {
 
 // MergePluginHooksIntoSettings merges plugin hooks into application settings.
 // Plugin hooks are appended after the existing hooks for each event.
-func MergePluginHooksIntoSettings(settings *setting.Settings) {
+func MergePluginHooksIntoSettings(settings *setting.Data) {
 	if settings.Hooks == nil {
 		settings.Hooks = make(map[string][]setting.Hook)
 	}

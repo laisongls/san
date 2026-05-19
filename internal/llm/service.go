@@ -1,14 +1,14 @@
 // Package llm holds the connected LLM provider plus the registry of
-// available providers/models. Exposes *Hub directly. *Hub
+// available providers/models. Exposes *ClientFactory directly. *ClientFactory
 // wraps the package-level *Setup (mutable provider/model/store under
 // a mutex).
 package llm
 
 import "context"
 
-// Hub is the concrete handle callers hold. Methods are
+// ClientFactory is the concrete handle callers hold. Methods are
 // mutex-protected views over the underlying *Setup.
-type Hub struct {
+type ClientFactory struct {
 	setup *Setup
 }
 
@@ -16,7 +16,7 @@ type Hub struct {
 type Options struct{}
 
 // Initialize discovers and connects to the best available LLM provider,
-// then publishes the result as the package-level *Hub.
+// then publishes the result as the package-level *ClientFactory.
 func Initialize(opts Options) {
 	store, _ := NewStore()
 	if store == nil {
@@ -57,69 +57,69 @@ func Initialize(opts Options) {
 	setSingleton()
 }
 
-// Default returns the package-level *Hub.
-func Default() *Hub {
-	return defaultHub
+// Default returns the package-level *ClientFactory.
+func Default() *ClientFactory {
+	return defaultClientFactory
 }
 
-// SetDefaultHub replaces the package-level *Hub. Intended for
-// tests. A nil argument restores a fresh empty *Hub.
-func SetDefaultHub(s *Hub) {
+// SetDefaultClientFactory replaces the package-level *ClientFactory. Intended for
+// tests. A nil argument restores a fresh empty *ClientFactory.
+func SetDefaultClientFactory(s *ClientFactory) {
 	if s == nil {
-		defaultHub = &Hub{setup: &Setup{}}
+		defaultClientFactory = &ClientFactory{setup: &Setup{}}
 		return
 	}
-	defaultHub = s
+	defaultClientFactory = s
 }
 
-// ResetDefaultHub restores a fresh empty *Hub. Intended for
+// ResetDefaultClientFactory restores a fresh empty *ClientFactory. Intended for
 // tests.
-func ResetDefaultHub() {
-	defaultHub = &Hub{setup: &Setup{}}
+func ResetDefaultClientFactory() {
+	defaultClientFactory = &ClientFactory{setup: &Setup{}}
 }
 
-var defaultHub = &Hub{setup: defaultSetup}
+var defaultClientFactory = &ClientFactory{setup: defaultSetup}
 
 // --- methods (mutex-protected views over Setup) ---
 
-func (s *Hub) Provider() Provider {
+func (s *ClientFactory) Provider() Provider {
 	s.setup.mu.RLock()
 	defer s.setup.mu.RUnlock()
 	return s.setup.Provider
 }
 
-func (s *Hub) SetProvider(p Provider) {
+func (s *ClientFactory) SetProvider(p Provider) {
 	s.setup.mu.Lock()
 	defer s.setup.mu.Unlock()
 	s.setup.Provider = p
 }
 
-func (s *Hub) ModelID() string { return s.setup.ModelID() }
+func (s *ClientFactory) ModelID() string { return s.setup.ModelID() }
 
-func (s *Hub) CurrentModel() *CurrentModelInfo {
+func (s *ClientFactory) CurrentModel() *CurrentModelInfo {
 	s.setup.mu.RLock()
 	defer s.setup.mu.RUnlock()
 	return s.setup.CurrentModel
 }
 
-func (s *Hub) SetCurrentModel(info *CurrentModelInfo) {
+func (s *ClientFactory) SetCurrentModel(info *CurrentModelInfo) {
 	s.setup.mu.Lock()
 	defer s.setup.mu.Unlock()
 	s.setup.CurrentModel = info
 }
 
-func (s *Hub) Store() *Store {
+func (s *ClientFactory) Store() *Store {
 	s.setup.mu.RLock()
 	defer s.setup.mu.RUnlock()
 	return s.setup.Store
 }
 
-func (s *Hub) NewClient(model string, maxTokens int) *Client {
+func (s *ClientFactory) NewClient(model string, maxTokens int) *Client {
 	p := s.Provider()
 	return NewClient(p, model, maxTokens)
 }
 
-func (s *Hub) ListProviders() map[Name][]Info {
+func (s *ClientFactory) ListProviders() map[Name][]Info {
 	st := s.Store()
 	return GetProvidersWithStatus(st)
 }

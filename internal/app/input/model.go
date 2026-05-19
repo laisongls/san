@@ -95,7 +95,7 @@ type SelectorDeps struct {
 	MCPRegistry      *coremcp.Registry
 	PluginRegistry   *coreplugin.Registry
 	IdentityRegistry *coreidentity.Registry
-	Setting          *coresetting.Manager
+	Setting          *coresetting.Settings
 	LoadDisabled     func(userLevel bool) map[string]bool
 	UpdateDisabled   func(disabled map[string]bool, userLevel bool) error
 }

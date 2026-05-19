@@ -49,7 +49,7 @@ var _ Handler = (*Engine)(nil)
 // All fields must be supplied by the caller — the hook package does not reach into
 // global singletons.
 type Options struct {
-	Settings       *setting.Settings
+	Settings       *setting.Data
 	SessionID      string
 	CWD            string
 	TranscriptPath string
@@ -102,5 +102,5 @@ var defaultEngine = newEmptyEngine()
 // newEmptyEngine returns an Engine wired to empty settings — fires no
 // hooks until Initialize installs a real one.
 func newEmptyEngine() *Engine {
-	return NewEngine(setting.NewSettings(), "", "", "")
+	return NewEngine(setting.NewData(), "", "", "")
 }

@@ -5,7 +5,7 @@ layer: feature
 
 # setting
 
-Settings loader, merger, and the central permission decision gate.
+Data loader, merger, and the central permission decision gate.
 Reads `~/.gen/settings.json` and `<project>/.gen/settings.json`, merges
 project-over-user with documented precedence, and decides allow / deny /
 ask for every tool call.
@@ -24,40 +24,40 @@ Two concerns live here:
 
 ## Contract
 
-Settings loader + central permission decision gate. *Manager wraps *Settings under a mutex; methods are mutex-protected views. The package exposes `*Manager` directly — no Service interface.
+Data loader + central permission decision gate. *Settings wraps *Data under a mutex; methods are mutex-protected views. The package exposes `*Settings` directly — no Service interface.
 
 ```go
 package setting
 
-// Manager is the opaque handle. Type exported; fields unexported.
-type Manager struct { /* internal fields */ }
+// Settings is the opaque handle. Type exported; fields unexported.
+type Settings struct { /* internal fields */ }
 
-func (s *Manager) Snapshot() *Settings
-func (s *Manager) AllowBypass() bool
-func (s *Manager) IsGitRepo(cwd string) bool
-func (s *Manager) Reload(cwd string) error
-func (s *Manager) DisabledTools() map[string]bool
-func (s *Manager) SearchProvider() string
-func (s *Manager) SetSearchProvider(provider string)
-func (s *Manager) Hooks() map[string][]Hook
-func (s *Manager) CheckPermission(toolName string, args map[string]any, session *SessionPermissions) PermissionBehavior
-func (s *Manager) HasPermissionToUseTool(toolName string, args map[string]any, session *SessionPermissions) PermissionDecision
-func (s *Manager) ResolveHookAllow(toolName string, args map[string]any, session *SessionPermissions) bool
-func (s *Manager) GetDisabledToolsAt(userLevel bool) map[string]bool
-func (s *Manager) UpdateDisabledToolsAt(disabledTools map[string]bool, userLevel bool) error
+func (s *Settings) Snapshot() *Data
+func (s *Settings) AllowBypass() bool
+func (s *Settings) IsGitRepo(cwd string) bool
+func (s *Settings) Reload(cwd string) error
+func (s *Settings) DisabledTools() map[string]bool
+func (s *Settings) SearchProvider() string
+func (s *Settings) SetSearchProvider(provider string)
+func (s *Settings) Hooks() map[string][]Hook
+func (s *Settings) CheckPermission(toolName string, args map[string]any, session *SessionPermissions) PermissionBehavior
+func (s *Settings) HasPermissionToUseTool(toolName string, args map[string]any, session *SessionPermissions) PermissionDecision
+func (s *Settings) ResolveHookAllow(toolName string, args map[string]any, session *SessionPermissions) bool
+func (s *Settings) GetDisabledToolsAt(userLevel bool) map[string]bool
+func (s *Settings) UpdateDisabledToolsAt(disabledTools map[string]bool, userLevel bool) error
 
 // Package-level access
 func Initialize(opts Options)
-func Default() *Manager
-func DefaultIfInit() *Manager           // nil pre-Initialize
-func SetDefaultManager(s *Manager)      // test-only
-func ResetDefaultManager()              // test-only
+func Default() *Settings
+func DefaultIfInit() *Settings           // nil pre-Initialize
+func SetDefaultSettings(s *Settings)      // test-only
+func ResetDefaultSettings()              // test-only
 ```
 
 
 ## Internals
 
-- `Settings` (`settings.go`) — value type holding all merged config.
+- `Data` (`settings.go`) — value type holding all merged config.
 - `loader.go` + `merger.go` — read the two tiers and combine them with
   documented precedence (project overrides user, except in a few flagged
   fields).

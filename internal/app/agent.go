@@ -1,4 +1,4 @@
-// Agent session lifecycle: building params, delegating to *agent.Session,
+// Agent session lifecycle: building params, delegating to *agent.Task,
 // and wrapping channels in tea.Cmds for the TUI.
 package app
 

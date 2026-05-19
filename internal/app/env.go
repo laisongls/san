@@ -47,7 +47,7 @@ type env struct {
 	CachedProjectInstructions string
 }
 
-func newEnv(llmSvc *llm.Hub, cwd string, isGit bool) env {
+func newEnv(llmSvc *llm.ClientFactory, cwd string, isGit bool) env {
 	return env{
 		CWD:   cwd,
 		IsGit: isGit,

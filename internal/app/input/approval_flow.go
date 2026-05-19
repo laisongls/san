@@ -34,7 +34,7 @@ type ApprovalFlowDeps struct {
 	Actions            ApprovalRuntime
 	Input              *Model
 	HookEngine         hook.Handler
-	Settings           *setting.Settings
+	Settings           *setting.Data
 	SessionPermissions *setting.SessionPermissions
 	SetOperationMode   func(setting.OperationMode)
 	Tool               *conv.ToolExecState

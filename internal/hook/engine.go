@@ -39,7 +39,7 @@ const defaultTimeout = 600
 
 // Engine executes hooks from settings, plugins, and runtime/session registration.
 type Engine struct {
-	settings       *setting.Settings
+	settings       *setting.Data
 	sessionID      string
 	cwd            string
 	transcriptPath string
@@ -60,7 +60,7 @@ type Engine struct {
 }
 
 // NewEngine creates a new hook execution engine.
-func NewEngine(settings *setting.Settings, sessionID, cwd, transcriptPath string) *Engine {
+func NewEngine(settings *setting.Data, sessionID, cwd, transcriptPath string) *Engine {
 	return &Engine{
 		settings:       settings,
 		sessionID:      sessionID,
@@ -143,7 +143,7 @@ func (e *Engine) SetEnvProvider(fn func() []string) {
 
 // SetSettings swaps the settings-backed hook source used by the engine.
 // Callers should merge plugin hooks into settings before calling this.
-func (e *Engine) SetSettings(settings *setting.Settings) {
+func (e *Engine) SetSettings(settings *setting.Data) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.settings = settings

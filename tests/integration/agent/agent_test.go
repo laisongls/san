@@ -208,7 +208,7 @@ func TestAgent_SubagentHooks_Fire(t *testing.T) {
 
 	// Build a settings object with SubagentStart and SubagentStop hooks.
 	// Each hook writes to a temp file so we can verify it fired.
-	settings := &setting.Settings{
+	settings := &setting.Data{
 		Hooks: map[string][]setting.Hook{
 			string(hook.SubagentStart): {
 				{

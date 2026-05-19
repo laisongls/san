@@ -74,7 +74,7 @@ func NewLoaderForCwd(cwd string) *Loader {
 //  4. .gen/settings.json
 //  5. .claude/settings.local.json
 //  6. .gen/settings.local.json
-func (l *Loader) Load() (*Settings, error) {
+func (l *Loader) Load() (*Data, error) {
 	homeDir, _ := os.UserHomeDir()
 
 	// Two-phase loading: first load Claude-compat settings, then GenCode-native.
@@ -109,13 +109,13 @@ func (l *Loader) Load() (*Settings, error) {
 	claudeHooks := make(map[string][]Hook)
 	nativeHooks := make(map[string][]Hook) // last write wins per event
 
-	settings := NewSettings()
+	settings := NewData()
 	for _, src := range sources {
 		data, err := os.ReadFile(src.path)
 		if err != nil {
 			continue
 		}
-		var s Settings
+		var s Data
 		if err := json.Unmarshal(data, &s); err != nil {
 			log.Logger().Warn("failed to parse config file", zap.String("path", src.path), zap.Error(err))
 			continue
@@ -164,12 +164,12 @@ func (l *Loader) Load() (*Settings, error) {
 }
 
 // LoadFile loads settings from a specific file.
-func (l *Loader) LoadFile(path string) (*Settings, error) {
+func (l *Loader) LoadFile(path string) (*Data, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var s Settings
+	var s Data
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, err
 	}
@@ -177,19 +177,19 @@ func (l *Loader) LoadFile(path string) (*Settings, error) {
 }
 
 // SaveToProject saves settings to the project-level settings file, merging with existing.
-func (l *Loader) SaveToProject(settings *Settings) error {
+func (l *Loader) SaveToProject(settings *Data) error {
 	return l.saveToFile(filepath.Join(l.projectDir, "settings.json"), settings)
 }
 
 // SaveToUser saves settings to the user-level settings file, merging with existing.
-func (l *Loader) SaveToUser(settings *Settings) error {
+func (l *Loader) SaveToUser(settings *Data) error {
 	return l.saveToFile(filepath.Join(l.userDir, "settings.json"), settings)
 }
 
-func (l *Loader) saveToFile(path string, settings *Settings) error {
+func (l *Loader) saveToFile(path string, settings *Data) error {
 	toSave := settings
 	if data, err := os.ReadFile(path); err == nil {
-		existing := NewSettings()
+		existing := NewData()
 		if err := json.Unmarshal(data, existing); err == nil {
 			toSave = mergeSettings(existing, settings)
 		}
@@ -219,12 +219,12 @@ func writeJSONAtomic(path string, v any) error {
 }
 
 var (
-	loadedSettings   *Settings
+	loadedSettings   *Data
 	loadedSettingsMu sync.Mutex
 )
 
 // Load loads settings using the default loader (cached after first call).
-func Load() (*Settings, error) {
+func Load() (*Data, error) {
 	loadedSettingsMu.Lock()
 	defer loadedSettingsMu.Unlock()
 	if loadedSettings != nil {
@@ -239,7 +239,7 @@ func Load() (*Settings, error) {
 }
 
 // Reload clears the settings cache and reloads from disk.
-func Reload() (*Settings, error) {
+func Reload() (*Data, error) {
 	loadedSettingsMu.Lock()
 	defer loadedSettingsMu.Unlock()
 	s, err := NewLoader().Load()
@@ -252,19 +252,19 @@ func Reload() (*Settings, error) {
 
 // LoadForCwd loads settings for the provided working directory without using
 // the process-global cache. This is used when the session cwd changes.
-func LoadForCwd(cwd string) (*Settings, error) {
+func LoadForCwd(cwd string) (*Data, error) {
 	return NewLoaderForCwd(cwd).Load()
 }
 
-// defaultSettings returns default settings without loading from disk.
-func defaultSettings() *Settings {
-	return NewSettings()
+// defaultData returns default settings without loading from disk.
+func defaultData() *Data {
+	return NewData()
 }
 
 // UpdateDisabledToolsAt updates disabled tools at user level (true) or project level (false).
 func UpdateDisabledToolsAt(disabledTools map[string]bool, userLevel bool) error {
 	loader := NewLoader()
-	settings := &Settings{DisabledTools: disabledTools}
+	settings := &Data{DisabledTools: disabledTools}
 
 	var err error
 	if userLevel {
@@ -336,7 +336,7 @@ func AddAllowRuleDirectlyAt(rule, cwd string) error {
 		return nil // already exists
 	}
 
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Allow: []string{rule},
 		},
@@ -361,7 +361,7 @@ func LoadTheme() string {
 
 // SaveTheme persists the chosen theme to ~/.gen/settings.json.
 func SaveTheme(t string) error {
-	if err := NewLoader().SaveToUser(&Settings{Theme: t}); err != nil {
+	if err := NewLoader().SaveToUser(&Data{Theme: t}); err != nil {
 		return err
 	}
 	loadedSettingsMu.Lock()
@@ -382,7 +382,7 @@ func SaveIdentity(name string) error {
 	}
 	path := filepath.Join(loader.userDir, "settings.json")
 
-	existing := NewSettings()
+	existing := NewData()
 	if data, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(data, existing)
 	}

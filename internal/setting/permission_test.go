@@ -104,7 +104,7 @@ func TestBuildRule(t *testing.T) {
 }
 
 func TestCheckPermission(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Allow: []string{
 				"Bash(cd:*)",
@@ -223,7 +223,7 @@ func TestCheckPermission(t *testing.T) {
 }
 
 func TestBashAllowRulesRequireEverySubcommand(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Allow: []string{"Bash(git:*)"},
 		},
@@ -312,7 +312,7 @@ func Test_isDestructiveCommand(t *testing.T) {
 }
 
 func TestDenyRulesPriorityOverSession(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Deny: []string{
 				"Read(**/.env)",
@@ -358,7 +358,7 @@ func TestDenyRulesPriorityOverSession(t *testing.T) {
 }
 
 func TestDestructiveCommandsRequireConfirmation(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{},
 	}
 
@@ -434,7 +434,7 @@ func Test_isSensitivePath(t *testing.T) {
 }
 
 func TestSensitivePathsBypassImmune(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Allow: []string{"Edit(**/*.json)"}, // Allow all JSON edits
 		},
@@ -539,7 +539,7 @@ func Test_checkBashSecurity(t *testing.T) {
 }
 
 func TestBashSecurityBypassImmune(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		AllowAllBash:    true,
 		AllowedTools:    make(map[string]bool),
@@ -570,7 +570,7 @@ func TestBashSecurityBypassImmune(t *testing.T) {
 }
 
 func TestCheckPermissionWithReason(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Allow: []string{"Bash(git:*)"},
 			Deny:  []string{"Read(**/.env)"},
@@ -625,7 +625,7 @@ func TestCheckPermissionWithReason(t *testing.T) {
 }
 
 func TestCheckPermissionWithReason_WorkingDirectoryConstraint(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		AllowAllEdits:      true,
 		WorkingDirectories: []string{"/home/user/project"},
@@ -678,7 +678,7 @@ func TestDenialTracking(t *testing.T) {
 }
 
 func TestBypassPermissionsMode(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		Mode:            ModeBypassPermissions,
 		AllowedTools:    make(map[string]bool),
@@ -729,7 +729,7 @@ func TestBypassPermissionsMode(t *testing.T) {
 }
 
 func TestDontAskMode(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		Mode:            ModeDontAsk,
 		AllowedTools:    make(map[string]bool),
@@ -775,7 +775,7 @@ func TestDontAskMode(t *testing.T) {
 }
 
 func TestAcceptEditsModeAllowsEditsButPromptsBash(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		Mode:            ModeAutoAccept,
 		AllowedTools:    make(map[string]bool),
@@ -791,7 +791,7 @@ func TestAcceptEditsModeAllowsEditsButPromptsBash(t *testing.T) {
 }
 
 func TestHeadlessCoercesAskToDeny(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		ShouldAvoidPrompts: true,
 		AllowedTools:       make(map[string]bool),
@@ -810,7 +810,7 @@ func TestHeadlessCoercesAskToDeny(t *testing.T) {
 }
 
 func TestDenyRuleBlocksBypass(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Deny: []string{"Read(**/.env)"},
 		},
@@ -829,7 +829,7 @@ func TestDenyRuleBlocksBypass(t *testing.T) {
 }
 
 func TestWorkingDirectoryConstraint(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 	session := &SessionPermissions{
 		AllowAllEdits:      true,
 		AllowAllWrites:     true,
@@ -892,7 +892,7 @@ func TestWorkingDirectoryConstraint(t *testing.T) {
 }
 
 func TestSafeToolAllowlist(t *testing.T) {
-	settings := &Settings{}
+	settings := &Data{}
 
 	// All safe tools, including read-only ones.
 	// Keep in sync with perm.safeTools (tool/perm/decision.go).
@@ -929,7 +929,7 @@ func TestPassthroughBehavior(t *testing.T) {
 }
 
 func TestResolveHookAllow(t *testing.T) {
-	settings := &Settings{
+	settings := &Data{
 		Permissions: PermissionSettings{
 			Allow: []string{"Bash(git:*)"},
 			Deny:  []string{"Read(**/.env)"},

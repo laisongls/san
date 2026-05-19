@@ -4,11 +4,11 @@ import "testing"
 
 // TestClonePreservesAllScalarFields guards against the Clone() drift that
 // caused identity to silently revert to default at startup: every scalar
-// field on Settings must round-trip through Clone. New fields should be
+// field on Data must round-trip through Clone. New fields should be
 // added here at the same time they are added to Clone().
 func TestClonePreservesAllScalarFields(t *testing.T) {
 	yes := true
-	src := &Settings{
+	src := &Data{
 		Model:          "claude-opus-4-7",
 		Theme:          "dark",
 		SearchProvider: "exa",

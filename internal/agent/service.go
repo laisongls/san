@@ -1,34 +1,34 @@
-// Package agent owns the foreground agent session lifecycle. *Session
+// Package agent owns the foreground agent session lifecycle. *Task
 // is the concrete handle; the package exposes it directly.
 package agent
 
 // Options holds dependencies for initialization.
 type Options struct{}
 
-// Initialize installs a fresh *Session as the package-level default.
+// Initialize installs a fresh *Task as the package-level default.
 func Initialize(opts Options) {
-	defaultSession = &Session{}
+	defaultTask = &Task{}
 }
 
-// Default returns the package-level *Session.
-func Default() *Session {
-	return defaultSession
+// Default returns the package-level *Task.
+func Default() *Task {
+	return defaultTask
 }
 
-// SetDefaultSession replaces the package-level *Session. Intended for
-// tests. A nil argument restores a fresh empty *Session.
-func SetDefaultSession(s *Session) {
+// SetDefaultTask replaces the package-level *Task. Intended for
+// tests. A nil argument restores a fresh empty *Task.
+func SetDefaultTask(s *Task) {
 	if s == nil {
-		defaultSession = &Session{}
+		defaultTask = &Task{}
 		return
 	}
-	defaultSession = s
+	defaultTask = s
 }
 
-// ResetDefaultSession restores a fresh empty *Session. Intended for
+// ResetDefaultTask restores a fresh empty *Task. Intended for
 // tests.
-func ResetDefaultSession() {
-	defaultSession = &Session{}
+func ResetDefaultTask() {
+	defaultTask = &Task{}
 }
 
-var defaultSession = &Session{}
+var defaultTask = &Task{}
