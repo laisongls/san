@@ -19,7 +19,7 @@ const ctrlODoubleTapWindow = 300 * time.Millisecond
 
 type ctrlOSingleTickMsg struct{}
 
-func (m *model) handleKeypress(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *model) routeKeypress(msg tea.KeyMsg) (tea.Cmd, bool) {
 	if active, cmd := m.delegateToActiveModal(msg); active {
 		return cmd, true
 	}
@@ -34,10 +34,10 @@ func (m *model) handleKeypress(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return c, ok
 	}
 
-	return m.handleInputKey(msg)
+	return m.handleTextareaShortcut(msg)
 }
 
-func (m *model) handleInputKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *model) handleTextareaShortcut(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.Type {
 	case tea.KeyTab, tea.KeyRight:
 		if m.userInput.PromptSuggestion.Text != "" && m.userInput.Textarea.Value() == "" {

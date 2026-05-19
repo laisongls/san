@@ -20,7 +20,7 @@ import (
 	"github.com/genai-io/gen-code/internal/log"
 )
 
-func (m *model) BeginInferTurn() {
+func (m *model) OnTurnBegin() {
 	if m.env.turnUsageActive {
 		return
 	}
@@ -29,7 +29,7 @@ func (m *model) BeginInferTurn() {
 	m.env.turnUsageActive = true
 }
 
-func (m *model) SetTokenUsage(resp *core.InferResponse) {
+func (m *model) OnTokenUsage(resp *core.InferResponse) {
 	if resp == nil {
 		return
 	}
@@ -73,14 +73,14 @@ func (m *model) SetTokenUsage(resp *core.InferResponse) {
 
 func (m *model) HasRunningTasks() bool { return m.services.Tracker.HasInProgress() }
 
-// HandleAgentMessage observes the agent's MessageEvent echoes. Every path
+// OnAgentMessage observes the agent's MessageEvent echoes. Every path
 // that hands a user message to the agent appends to m.conv at the call site,
 // so the echo has nothing to do here — appending again would double-display.
-func (m *model) HandleAgentMessage(core.Message) tea.Cmd {
+func (m *model) OnAgentMessage(core.Message) tea.Cmd {
 	return nil
 }
 
-func (m *model) ProcessToolResult(tr core.ToolResult) *core.ToolResult {
+func (m *model) OnToolResult(tr core.ToolResult) *core.ToolResult {
 	sideEffect := m.services.Tool.PopSideEffect(tr.ToolCallID)
 	if sideEffect != nil {
 		m.applyToolSideEffects(tr.ToolName, sideEffect)
@@ -97,16 +97,16 @@ func (m *model) ProcessToolResult(tr core.ToolResult) *core.ToolResult {
 	return result
 }
 
-func (m *model) ProcessTurnEnd(result core.Result) tea.Cmd {
+func (m *model) OnTurnEnd(result core.Result) tea.Cmd {
 	m.env.turnUsageActive = false
 	if m.services.Tracker.AllDone() {
 		m.services.Tracker.Reset()
 	}
-	log.QueueLog("ProcessTurnEnd: starting queueLen=%d", m.userInput.Queue.Len())
+	log.QueueLog("OnTurnEnd: starting queueLen=%d", m.userInput.Queue.Len())
 	commitCmds := m.CommitMessages()
 
 	if cmd, found := m.drainTurnQueues(); found {
-		log.QueueLog("ProcessTurnEnd: drained queued message, skipping hooks")
+		log.QueueLog("OnTurnEnd: drained queued message, skipping hooks")
 		if cmd != nil {
 			commitCmds = append(commitCmds, cmd)
 		}
@@ -114,12 +114,12 @@ func (m *model) ProcessTurnEnd(result core.Result) tea.Cmd {
 		return tea.Batch(commitCmds...)
 	}
 
-	log.QueueLog("ProcessTurnEnd: firing idle hooks async")
+	log.QueueLog("OnTurnEnd: firing idle hooks async")
 	commitCmds = append(commitCmds, m.fireIdleHooksCmd(result), m.ContinueOutbox())
 	return tea.Batch(commitCmds...)
 }
 
-func (m *model) ProcessAgentStop(err error) tea.Cmd {
+func (m *model) OnAgentStop(err error) tea.Cmd {
 	m.env.turnUsageActive = false
 	// /clear and manual stop cancel the active agent context; that is expected
 	// shutdown, not an agent failure the user needs to see.

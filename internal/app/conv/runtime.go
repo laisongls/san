@@ -19,16 +19,16 @@ type AgentOutboxMsg struct {
 type Runtime interface {
 	CommitMessages() []tea.Cmd
 	ContinueOutbox() tea.Cmd
-	BeginInferTurn()
-	SetTokenUsage(resp *core.InferResponse)
-	HandleAgentMessage(msg core.Message) tea.Cmd
-	ProcessToolResult(tr core.ToolResult) *core.ToolResult
-	ProcessTurnEnd(result core.Result) tea.Cmd
-	ProcessAgentStop(err error) tea.Cmd
-	HandlePermBridge(req *PermBridgeRequest) tea.Cmd
-	HandleAgentCompact(info core.CompactInfo) tea.Cmd
-	HandleCompactResult(msg CompactResultMsg) tea.Cmd
-	HandleTokenLimitResult(msg kit.TokenLimitResultMsg) tea.Cmd
+	OnTurnBegin()
+	OnTokenUsage(resp *core.InferResponse)
+	OnAgentMessage(msg core.Message) tea.Cmd
+	OnToolResult(tr core.ToolResult) *core.ToolResult
+	OnTurnEnd(result core.Result) tea.Cmd
+	OnAgentStop(err error) tea.Cmd
+	OnPermBridgeRequest(req *PermBridgeRequest) tea.Cmd
+	OnAutoCompact(info core.CompactInfo) tea.Cmd
+	OnCompactResult(msg CompactResultMsg) tea.Cmd
+	OnTokenLimitResult(msg kit.TokenLimitResultMsg) tea.Cmd
 	HasRunningTasks() bool
 }
 

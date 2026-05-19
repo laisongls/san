@@ -276,7 +276,7 @@ func (m *model) ContinueOutbox() tea.Cmd {
 	return conv.DrainAgentOutbox(m.services.Agent.Outbox())
 }
 
-func (m *model) HandlePermBridge(req *conv.PermBridgeRequest) tea.Cmd {
+func (m *model) OnPermBridgeRequest(req *conv.PermBridgeRequest) tea.Cmd {
 	m.services.Agent.SetPendingPermission(req)
 	if req == nil {
 		return nil

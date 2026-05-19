@@ -35,7 +35,7 @@ func (m *model) BuildCompactRequest(focus, trigger string) conv.CompactRequest {
 	}
 }
 
-func (m *model) HandleAgentCompact(info core.CompactInfo) tea.Cmd {
+func (m *model) OnAutoCompact(info core.CompactInfo) tea.Cmd {
 	scrollbackCmds := m.commitAllMessages()
 	boundaryStyle := lipgloss.NewStyle().Foreground(kit.CurrentTheme.Muted)
 	boundary := boundaryStyle.Render(fmt.Sprintf("✻ Conversation compacted — %d messages summarized (scroll up for history)", info.OriginalCount))
@@ -60,9 +60,9 @@ func (m *model) HandleAgentCompact(info core.CompactInfo) tea.Cmd {
 	return tea.Batch(scrollPart, m.ContinueOutbox(), kit.StatusTimer(3*time.Second, token))
 }
 
-// HandleCompactResult handles manual /compact results.
+// OnCompactResult handles manual /compact results.
 // Stops the agent so the next user message restarts it with compacted messages.
-func (m *model) HandleCompactResult(msg conv.CompactResultMsg) tea.Cmd {
+func (m *model) OnCompactResult(msg conv.CompactResultMsg) tea.Cmd {
 	if msg.Error != nil {
 		m.conv.Compact.Complete(fmt.Sprintf("Compaction could not be completed: %v", msg.Error), true)
 		return tea.Batch(m.CommitMessages()...)
@@ -101,7 +101,7 @@ func (m *model) HandleCompactResult(msg conv.CompactResultMsg) tea.Cmd {
 	return tea.Batch(scrollPart, tea.Batch(m.CommitMessages()...), kit.StatusTimer(3*time.Second, token))
 }
 
-func (m *model) HandleTokenLimitResult(msg kit.TokenLimitResultMsg) tea.Cmd {
+func (m *model) OnTokenLimitResult(msg kit.TokenLimitResultMsg) tea.Cmd {
 	m.userInput.Provider.FetchingLimits = false
 	var content string
 	if msg.Error != nil {

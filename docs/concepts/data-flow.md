@@ -70,13 +70,13 @@ tea.KeyMsg('h')                  ── per keystroke
    │
    ▼
 Update                            update.go
-   ├─ case tea.KeyMsg → handleKeypress
+   ├─ case tea.KeyMsg → routeKeypress
    │     ├─ delegateToActiveModal  (no modal active)
    │     ├─ overlay overrides       (no overlay active)
-   │     └─ handleInputKey
+   │     └─ handleTextareaShortcut
    │           └─ default for KeyRunes → (nil, false)
    │
-   └─ routeFeatureUpdate (no handler claims it)
+   └─ routeToSubModel (no handler claims it)
    └─ updateTextarea                ← textarea consumes the rune
    ▼
 View                              view.go      bottom UI shows "h▮"
@@ -88,7 +88,7 @@ Five rune-keystrokes later, textarea holds `hello`. User presses **Enter**:
 tea.KeyMsg(Enter)
    │
    ▼
-handleKeypress → handleInputKey
+routeKeypress → handleTextareaShortcut
    └─ case tea.KeyEnter → m.handleSubmit()       update_submit.go
         │
         ▼
@@ -167,7 +167,7 @@ subagent completes                      eventHub publishes → m.mainEvents chan
 
 ────────── turn boundary ──────────
 
-ProcessTurnEnd                          model_agent_events.go
+OnTurnEnd                          model_agent_events.go
    └─ drainTurnQueues                   model_turn_queue.go (priority order)
         ├─ user input queue?
         ├─ cron queue?       → injectCronPrompt(prompt)
@@ -202,18 +202,18 @@ ContinueOutbox tea.Cmd                  agent.go: reads one event
 tea.Msg (typed as a conv.* msg)
    │
    ▼
-Update → routeFeatureUpdate             update.go
+Update → routeToSubModel             update.go
    └─ conv.Update(m, &m.conv, msg)      app/conv/update.go
          │
          │ dispatches by event type, calls back into m via the
          │ conv.Runtime interface that *model implements:
          │
          ▼
-   m.BeginInferTurn()                   turn start  ── model_agent_events.go
-   m.SetTokenUsage(resp)                streaming token counts
-   m.HandleAgentCompact(info)           auto-compact ── model_compact.go
-   m.ProcessToolResult(tr)              tool finished
-   m.ProcessTurnEnd(result)             turn complete
+   m.OnTurnBegin()                   turn start  ── model_agent_events.go
+   m.OnTokenUsage(resp)                streaming token counts
+   m.OnAutoCompact(info)           auto-compact ── model_compact.go
+   m.OnToolResult(tr)              tool finished
+   m.OnTurnEnd(result)             turn complete
         │
         ├─ m.CommitMessages()           model_scrollback.go
         │       │
@@ -224,7 +224,7 @@ Update → routeFeatureUpdate             update.go
         └─ m.drainTurnQueues()          model_turn_queue.go
                 see Path C
 
-   m.ProcessAgentStop(err)              turn ended (or canceled)
+   m.OnAgentStop(err)              turn ended (or canceled)
 ```
 
 Two distinct render paths:
@@ -239,7 +239,7 @@ Two distinct render paths:
 Streaming assistant tokens accumulate in `m.conv.Messages` but are not
 `Println`-ed until they're "committed" — `renderAndCommit(checkReady=true)`
 skips the last message if it's still streaming. The final
-`ProcessTurnEnd` commits it.
+`OnTurnEnd` commits it.
 
 ## File pointers
 

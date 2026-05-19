@@ -17,18 +17,18 @@ func Update(rt Runtime, m *Model, msg tea.Msg) (tea.Cmd, bool) {
 	case AgentOutboxMsg:
 		if msg.Closed && len(msg.Batch) == 0 {
 			m.Stream.Stop()
-			return rt.ProcessAgentStop(nil), true
+			return rt.OnAgentStop(nil), true
 		}
 		if len(msg.Batch) > 0 {
 			return handleAgentEventBatch(rt, m, msg.Batch, msg.Closed), true
 		}
 		return handleAgentEvent(rt, m, msg.Event), true
 	case PermBridgeMsg:
-		return rt.HandlePermBridge(msg.Request), true
+		return rt.OnPermBridgeRequest(msg.Request), true
 	case CompactResultMsg:
-		return rt.HandleCompactResult(msg), true
+		return rt.OnCompactResult(msg), true
 	case kit.TokenLimitResultMsg:
-		return rt.HandleTokenLimitResult(msg), true
+		return rt.OnTokenLimitResult(msg), true
 	case ProgressUpdateMsg:
 		if msg.Index < 0 && msg.ToolCallID != "" {
 			msg.Index = m.Tool.IndexOf(msg.ToolCallID)
@@ -53,15 +53,15 @@ func handleAgentEvent(rt Runtime, m *Model, ev core.Event) tea.Cmd {
 		result, _ := ev.Result()
 		m.Stream.Stop()
 		m.Tool.ClearPending()
-		return rt.ProcessTurnEnd(result)
+		return rt.OnTurnEnd(result)
 	case core.OnStop:
 		err, _ := ev.Error()
 		m.Stream.Stop()
 		m.Tool.ClearPending()
-		return rt.ProcessAgentStop(err)
+		return rt.OnAgentStop(err)
 	case core.OnCompact:
 		info, _ := ev.CompactInfo()
-		return rt.HandleAgentCompact(info)
+		return rt.OnAutoCompact(info)
 	default:
 		if extra := applyAgentEvent(rt, m, ev); extra != nil {
 			return tea.Batch(extra, rt.ContinueOutbox())
@@ -81,17 +81,17 @@ func handleAgentEventBatch(rt Runtime, m *Model, events []core.Event, closed boo
 			result, _ := ev.Result()
 			m.Stream.Stop()
 			m.Tool.ClearPending()
-			cmds = append(cmds, rt.ProcessTurnEnd(result))
+			cmds = append(cmds, rt.OnTurnEnd(result))
 			needsContinue = false
 		case core.OnStop:
 			err, _ := ev.Error()
 			m.Stream.Stop()
 			m.Tool.ClearPending()
-			cmds = append(cmds, rt.ProcessAgentStop(err))
+			cmds = append(cmds, rt.OnAgentStop(err))
 			needsContinue = false
 		case core.OnCompact:
 			info, _ := ev.CompactInfo()
-			cmds = append(cmds, rt.HandleAgentCompact(info))
+			cmds = append(cmds, rt.OnAutoCompact(info))
 			needsContinue = false
 		default:
 			if extra := applyAgentEvent(rt, m, ev); extra != nil {
@@ -105,7 +105,7 @@ func handleAgentEventBatch(rt Runtime, m *Model, events []core.Event, closed boo
 	if closed {
 		m.Stream.Stop()
 		m.Tool.ClearPending()
-		cmds = append(cmds, rt.ProcessAgentStop(nil))
+		cmds = append(cmds, rt.OnAgentStop(nil))
 		needsContinue = false
 	}
 
@@ -130,7 +130,7 @@ func applyAgentEvent(rt Runtime, m *Model, ev core.Event) tea.Cmd {
 		if !ok {
 			return nil
 		}
-		return rt.HandleAgentMessage(msg)
+		return rt.OnAgentMessage(msg)
 	case core.PreInfer:
 		return applyPreInfer(rt, m)
 	case core.OnChunk:
@@ -148,7 +148,7 @@ func applyAgentEvent(rt Runtime, m *Model, ev core.Event) tea.Cmd {
 }
 
 func applyPreInfer(rt Runtime, m *Model) tea.Cmd {
-	rt.BeginInferTurn()
+	rt.OnTurnBegin()
 	m.Stream.Active = true
 	m.Stream.BuildingTool = ""
 	commitCmds := rt.CommitMessages()
@@ -183,7 +183,7 @@ func applyPostInfer(rt Runtime, m *Model, ev core.Event) tea.Cmd {
 	if !ok {
 		return nil
 	}
-	rt.SetTokenUsage(resp)
+	rt.OnTokenUsage(resp)
 	m.Compact.WarningSuppressed = false
 	if resp.ThinkingSignature != "" {
 		m.SetLastThinkingSignature(resp.ThinkingSignature)
@@ -213,7 +213,7 @@ func applyPostTool(rt Runtime, m *Model, ev core.Event) tea.Cmd {
 		m.TaskProgress = nil
 	}
 	m.Tool.MarkComplete(tr.ToolCallID)
-	result := rt.ProcessToolResult(tr)
+	result := rt.OnToolResult(tr)
 	m.Append(core.ChatMessage{
 		Role:       core.RoleUser,
 		ToolName:   tr.ToolName,

@@ -153,7 +153,7 @@ func (m *model) drainInputQueueAfterCancel() tea.Cmd {
 // fire, hook continuation, hub notification. It ensures the agent session
 // is up, hands `content` + `images` to the agent's inbox, and returns a
 // cmd that polls the outbox. Agent events flow back through Update →
-// routeFeatureUpdate → conv.Update → model conv.Runtime callbacks
+// routeToSubModel → conv.Update → model conv.Runtime callbacks
 // (see model_agent_events.go).
 //
 // On error (no provider connected, ensureAgentSession failed), appends a

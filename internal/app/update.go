@@ -54,7 +54,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.userInput.Textarea.SetValue(string(msg))
 		return m, m.handleSubmit()
 	case tea.KeyMsg:
-		if c, ok := m.handleKeypress(msg); ok {
+		if c, ok := m.routeKeypress(msg); ok {
 			return m, c
 		}
 	case tea.WindowSizeMsg:
@@ -104,13 +104,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.handleStopHookResult(msg)
 	}
 
-	if cmd, handled := m.routeFeatureUpdate(msg); handled {
+	if cmd, handled := m.routeToSubModel(msg); handled {
 		return m, cmd
 	}
 	return m, m.updateTextarea(msg)
 }
 
-func (m *model) routeFeatureUpdate(msg tea.Msg) (tea.Cmd, bool) {
+func (m *model) routeToSubModel(msg tea.Msg) (tea.Cmd, bool) {
 	if cmd, ok := conv.Update(m, &m.conv, msg); ok {
 		return cmd, true
 	}
