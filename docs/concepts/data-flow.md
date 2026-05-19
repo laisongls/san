@@ -14,8 +14,15 @@ loop. Three Bubble Tea primitives drive everything:
 - **`Update(msg)`** — pure function that mutates the model and returns a
   `tea.Cmd`.
 - **`tea.Cmd`** — a function the framework will run; its return value is
-  injected back as a new `tea.Msg`. This is how async work re-enters the
-  model.
+  injected back as a new `tea.Msg`. **This is how async work re-enters the
+  model.** Whenever you see a function "return a cmd," that cmd will be
+  scheduled by Bubble Tea, its output captured as a `tea.Msg`, and fed
+  back into `Update`.
+
+Convention: many internal handlers return `(tea.Cmd, bool)`. The bool
+means **"did I claim this event?"** — `true` stops the chain, `false`
+lets the caller try the next layer. `(nil, false)` is the common
+"not for me" return.
 
 Input sources land as `tea.Msg`. **`SubmitToAgent`** is the single exit
 to the running agent. Rendering happens via `tea.Println` (terminal
@@ -104,25 +111,47 @@ tea.KeyMsg(Enter)
    │
    ▼
 routeKeypress → handleTextareaShortcut
+   │   "shortcut" = keys with a special meaning to the textarea
+   │   (Ctrl-C/D/L/E/O/U/V/Y/T, Tab, Shift+Tab, Enter, Esc, ↑↓ history)
    └─ case tea.KeyEnter → m.handleSubmit()       update_submit.go
         │
         ▼
    handleSubmit
         Step 1: read textarea ────► "hello"
-        Step 2: stream active? ───► no
+        Step 2: stream active? ───► no (no answer mid-stream)
         Step 3: → dispatchSubmission("hello")
                   │
                   ▼
    dispatchSubmission
         Step 1: "exit" literal? ──► no
         Step 2: prompt hook ──────► allowed
-        Step 3: record to history
+                    │  Any UserPromptSubmit hook (see hook pkg) gets to
+                    │  read the prompt and optionally block it (e.g. a
+                    │  policy hook rejecting prompts containing secrets).
+                    │  "Allowed" = no hook blocked.
+        Step 3: record to history (↑/↓ recall in the textarea)
         Step 4: slash command? ───► no (no leading "/")
         Step 5: send to agent
                   ├─ plugin.ClearActivePluginRoot()
+                  │     If a previous /plugin command set an "active
+                  │     plugin scope" (so its skills/agents resolve
+                  │     locally), normal user turns clear it — this
+                  │     prompt is the user's, not the plugin's.
+                  │
                   ├─ buildUserMessage("hello") → ChatMessage{Role: user}
+                  │     Resolves image refs (`[image.png]` → bytes) and
+                  │     splits inline-pasted images out of the text.
+                  │
                   ├─ conv.Append(msg)
+                  │     Appends to m.conv.Messages. Two consumers:
+                  │       1. View() renders this slice as scrollback.
+                  │       2. Agent reads it via ConvertToProvider() when
+                  │          building the next LLM request.
+                  │
                   ├─ userInput.Reset()
+                  │     Clears textarea + pending images so the user can
+                  │     start the next message.
+                  │
                   └─ SubmitToAgent(msg.Content, msg.Images)
                         │
                         ▼
@@ -130,7 +159,13 @@ routeKeypress → handleTextareaShortcut
         ├─ provider connected?    yes
         ├─ ensureAgentSession()    starts agent goroutine if needed
         ├─ sendToAgent ───────────► agent.Task inbox channel
+        │                           (a Go channel; non-blocking push)
+        │
         └─ returns ContinueOutbox cmd  (see Path D)
+              That cmd, when bubbletea runs it, will read one event off
+              the agent's Outbox channel and produce a tea.Msg back into
+              Update. The first event normally arrives within ms once
+              the LLM starts streaming.
 ```
 
 ## Path B — Slash command
@@ -158,8 +193,8 @@ handleSubmit → dispatchSubmission
         └─ returns (result="conversation cleared", cmd=nil, nil)
               │
               ▼
-   c.deps.Conversation.AddNotice(result)    "conversation cleared"
-   c.deps.CommitMessages()                  → tea.Println to scrollback
+   c.env.Conversation.AddNotice(result)    "conversation cleared"
+   c.env.CommitMessages()                  → tea.Println to scrollback
 ```
 
 A slash command's handler reads live state via `env.*` (services),
