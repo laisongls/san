@@ -1,9 +1,8 @@
-// Sub-feature wiring: every sub-feature (input overlay, prompt suggestion,
-// trigger) declares the surface it uses via a Deps struct rather than
-// reaching for package globals. The functions here translate the model's
-// services + env state into those structs. Keeping the wiring in one file
-// keeps update.go / model.go concise and makes each sub-feature's surface
-// explicit at the call site.
+// Methods on *model that exist for sub-features (input overlay, prompt
+// suggestion, trigger) to consume. Most build the Deps struct each
+// sub-feature declares; a few expose model state (spinner tick, cron
+// queue reset) or actions (external editor) the sub-features need.
+// Centralized here so update.go / model.go stay focused on the main loop.
 package app
 
 import (
