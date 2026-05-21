@@ -53,22 +53,19 @@ var CurrentTheme = Theme{
 var (
 	darkModeSet bool
 	darkModeVal bool
-	autoTheme   bool
 )
 
 func InitTheme(t string) {
 	switch t {
 	case "light":
-		darkModeSet, darkModeVal, autoTheme = true, false, false
+		darkModeSet, darkModeVal = true, false
 		lipgloss.SetHasDarkBackground(false)
 	case "dark":
-		darkModeSet, darkModeVal, autoTheme = true, true, false
+		darkModeSet, darkModeVal = true, true
 		lipgloss.SetHasDarkBackground(true)
 	case "auto":
-		darkModeSet, autoTheme = true, true
-		// Don't call SetHasDarkBackground or force detection here — the
-		// terminal isn't yet in raw mode. IsDarkBackground will auto-detect
-		// lazily on first use during rendering.
+		darkModeSet = true
+		darkModeVal = lipgloss.HasDarkBackground()
 	default:
 		return
 	}
@@ -95,9 +92,6 @@ func ResolveTheme(configuredTheme string, saveTheme func(string) error) (userQui
 
 func IsDarkBackground() bool {
 	if darkModeSet {
-		if autoTheme {
-			return lipgloss.HasDarkBackground()
-		}
 		return darkModeVal
 	}
 	return lipgloss.HasDarkBackground()
