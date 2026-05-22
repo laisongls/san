@@ -40,9 +40,11 @@ func (m *OutputModel) ResizeMDRenderer(width int) {
 
 func newSpinner() spinner.Model {
 	sp := spinner.New()
+	// 4-pt → 6-pt → 8-pt → 6-pt stars read as a rotating sparkle while
+	// the model is thinking / streaming.
 	sp.Spinner = spinner.Spinner{
-		Frames: []string{"⋅", "·", "•", "●", "•", "·", "⋅"},
-		FPS:    120 * time.Millisecond,
+		Frames: []string{"✦", "✶", "✸", "✶"},
+		FPS:    360 * time.Millisecond,
 	}
 	sp.Style = lipgloss.NewStyle()
 	return sp
