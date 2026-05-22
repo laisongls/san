@@ -929,13 +929,19 @@ func agentColorForInput(input string, colors map[string]string) string {
 	return colors[strings.ToLower(parseAgentInput(input).Type)]
 }
 
-const agentBlinkTicks = 6
+// agentBlinkTicks is the number of spinner ticks each frame is held for.
+// One spinner tick is ~120ms (see newSpinner in model.go).
+const agentBlinkTicks = 3
+
+// agentSpinFrames cycle 4-pt → 6-pt → 8-pt → 6-pt stars so the icon reads
+// as rotating while it runs.
+var agentSpinFrames = []string{"✦", "✶", "✸", "✶"}
 
 func agentIcon(tick int) string {
-	if (tick/agentBlinkTicks)%2 == 0 {
-		return "●"
+	if tick < 0 {
+		tick = 0
 	}
-	return "○"
+	return agentSpinFrames[(tick/agentBlinkTicks)%len(agentSpinFrames)]
 }
 
 func truncateToolLabel(label string, width int) string {

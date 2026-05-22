@@ -300,7 +300,8 @@ func TestRenderToolCallsShowsGapForPendingAgent(t *testing.T) {
 	}
 
 	rendered := RenderToolCalls(params)
-	if !strings.Contains(rendered, "○ Agent - Explorer: HA code structure") {
+	want := agentIcon(params.Blink) + " Agent - Explorer: HA code structure"
+	if !strings.Contains(rendered, want) {
 		t.Fatalf("RenderToolCalls() = %q, want a single visible gap before explicit agent label", rendered)
 	}
 }
@@ -322,7 +323,8 @@ func TestRenderToolCallsNamesGeneralAgentByMode(t *testing.T) {
 	}
 
 	rendered := stripANSI(RenderToolCalls(params))
-	if !strings.Contains(rendered, "○ Agent - Explorer: audit git changes") {
+	want := agentIcon(params.Blink) + " Agent - Explorer: audit git changes"
+	if !strings.Contains(rendered, want) {
 		t.Fatalf("RenderToolCalls() = %q, want mode-based agent label", rendered)
 	}
 }
@@ -357,7 +359,8 @@ func TestRenderToolCallsShowsSingleAgentRuntimeProgress(t *testing.T) {
 	}
 
 	rendered := stripANSI(RenderToolCalls(params))
-	if !strings.Contains(rendered, "○ Agent - Explorer: audit git changes before review") {
+	want := agentIcon(params.Blink) + " Agent - Explorer: audit git changes before review"
+	if !strings.Contains(rendered, want) {
 		t.Fatalf("RenderToolCalls() = %q, want agent header", rendered)
 	}
 	if !strings.Contains(rendered, "model: gpt-5.4-mini") || !strings.Contains(rendered, "mode: explore") || !strings.Contains(rendered, "tools: 4") {
