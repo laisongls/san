@@ -60,4 +60,3 @@ func TestMarkToolCallCompleteAdvancesAndClearsPendingState(t *testing.T) {
 		t.Fatalf("CurrentIdx = %d, want 0", state.CurrentIdx)
 	}
 }
-
