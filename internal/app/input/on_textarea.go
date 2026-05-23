@@ -462,6 +462,18 @@ func (m *Model) HandleSuggestionKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case tea.KeyDown, tea.KeyCtrlN:
 		m.Suggestions.MoveDown()
 		return nil, true
+	case tea.KeyPgUp:
+		m.Suggestions.MovePageUp()
+		return nil, true
+	case tea.KeyPgDown:
+		m.Suggestions.MovePageDown()
+		return nil, true
+	case tea.KeyHome:
+		m.Suggestions.MoveToTop()
+		return nil, true
+	case tea.KeyEnd:
+		m.Suggestions.MoveToEnd()
+		return nil, true
 	case tea.KeyTab, tea.KeyEnter:
 		if selected := m.Suggestions.GetSelected(); selected != "" {
 			if m.Suggestions.GetSuggestionType() == suggest.TypeFile {

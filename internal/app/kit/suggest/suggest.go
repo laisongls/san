@@ -66,9 +66,13 @@ type State struct {
 	suggestions     []Suggestion
 	fileSuggestions []fileSuggestion
 	selectedIdx     int
+	viewStart       int
 	cwd             string
 	atQuery         string
 	cmdMatcher      Matcher
+
+	allFiles    []fileSuggestion
+	allFilesCwd string
 }
 
 func NewState(matcher Matcher) State {
@@ -83,6 +87,7 @@ func (s *State) Reset() {
 	s.suggestions = nil
 	s.fileSuggestions = nil
 	s.selectedIdx = 0
+	s.viewStart = 0
 	s.atQuery = ""
 }
 
@@ -92,6 +97,10 @@ func (s *State) UpdateSuggestions(input string) {
 	if atIdx := strings.LastIndex(input, "@"); atIdx >= 0 {
 		query := input[atIdx+1:]
 		if atIdx == len(input)-1 || !strings.ContainsAny(query, " \t\n") {
+			if s.atQuery != query {
+				s.selectedIdx = 0
+				s.viewStart = 0
+			}
 			s.atQuery = query
 			s.updatefileSuggestions(query)
 			return
@@ -119,9 +128,10 @@ func (s *State) UpdateSuggestions(input string) {
 }
 
 const (
-	fileScanMaxResults = 10
-	fileScanMaxDepth   = 4
-	fileScanMaxDisplay = 8
+	fileScanMaxResults     = 500
+	fileScanMaxDirsVisited = 2000
+	fileScanMaxDepth       = 6
+	fileSuggestionViewSize = 8
 )
 
 func (s *State) updatefileSuggestions(query string) {
@@ -134,13 +144,19 @@ func (s *State) updatefileSuggestions(query string) {
 		return
 	}
 
-	s.fileSuggestions = s.scanMarkdownFiles(query)
-	s.sortAndLimitSuggestions()
+	if s.allFilesCwd != s.cwd {
+		s.allFiles = s.scanAllFiles()
+		s.allFilesCwd = s.cwd
+	}
+
+	s.fileSuggestions = filterFiles(s.allFiles, query)
+	s.sortSuggestions()
 
 	s.visible = len(s.fileSuggestions) > 0
 	if s.selectedIdx >= len(s.fileSuggestions) {
 		s.selectedIdx = 0
 	}
+	s.clampViewStart()
 }
 
 var supportedFileExtensions = map[string]bool{
@@ -152,34 +168,42 @@ var supportedFileExtensions = map[string]bool{
 	".webp": true,
 }
 
-func (s *State) scanMarkdownFiles(query string) []fileSuggestion {
-	queryLower := strings.ToLower(query)
+func (s *State) scanAllFiles() []fileSuggestion {
 	seen := make(map[string]bool)
 	var results []fileSuggestion
 
-	var walkDir func(dir string, depth int)
-	walkDir = func(dir string, depth int) {
-		if depth > fileScanMaxDepth || len(results) >= fileScanMaxResults {
-			return
+	type queueItem struct {
+		dir   string
+		depth int
+	}
+	queue := []queueItem{{s.cwd, 0}}
+	dirsVisited := 0
+
+	for len(queue) > 0 && len(results) < fileScanMaxResults && dirsVisited < fileScanMaxDirsVisited {
+		item := queue[0]
+		queue = queue[1:]
+
+		if item.depth > fileScanMaxDepth {
+			continue
 		}
 
-		entries, err := os.ReadDir(dir)
+		entries, err := os.ReadDir(item.dir)
 		if err != nil {
-			return
+			continue
 		}
+		dirsVisited++
 
-		var subdirs []string
 		for _, entry := range entries {
 			if len(results) >= fileScanMaxResults {
-				return
+				break
 			}
 
 			name := entry.Name()
-			fullPath := filepath.Join(dir, name)
+			fullPath := filepath.Join(item.dir, name)
 
 			if entry.IsDir() {
-				if !shouldSkipDirectory(name) {
-					subdirs = append(subdirs, fullPath)
+				if !shouldSkipDirectory(name) && item.depth < fileScanMaxDepth {
+					queue = append(queue, queueItem{fullPath, item.depth + 1})
 				}
 				continue
 			}
@@ -195,28 +219,35 @@ func (s *State) scanMarkdownFiles(query string) []fileSuggestion {
 			}
 			seen[relPath] = true
 
-			if query != "" && !kit.FuzzyMatch(strings.ToLower(relPath), queryLower) {
-				continue
-			}
-
 			results = append(results, fileSuggestion{
 				Path:        relPath,
 				DisplayName: relPath,
 				IsDir:       false,
 			})
 		}
-
-		for _, subdir := range subdirs {
-			walkDir(subdir, depth+1)
-		}
 	}
 
-	walkDir(s.cwd, 0)
 	return results
 }
 
-func (s *State) sortAndLimitSuggestions() {
-	sort.Slice(s.fileSuggestions, func(i, j int) bool {
+func filterFiles(all []fileSuggestion, query string) []fileSuggestion {
+	if query == "" {
+		out := make([]fileSuggestion, len(all))
+		copy(out, all)
+		return out
+	}
+	queryLower := strings.ToLower(query)
+	var filtered []fileSuggestion
+	for _, f := range all {
+		if kit.FuzzyMatch(strings.ToLower(f.Path), queryLower) {
+			filtered = append(filtered, f)
+		}
+	}
+	return filtered
+}
+
+func (s *State) sortSuggestions() {
+	sort.SliceStable(s.fileSuggestions, func(i, j int) bool {
 		depthI := strings.Count(s.fileSuggestions[i].Path, "/")
 		depthJ := strings.Count(s.fileSuggestions[j].Path, "/")
 		if depthI != depthJ {
@@ -224,41 +255,99 @@ func (s *State) sortAndLimitSuggestions() {
 		}
 		return len(s.fileSuggestions[i].Path) < len(s.fileSuggestions[j].Path)
 	})
-
-	if len(s.fileSuggestions) > fileScanMaxDisplay {
-		s.fileSuggestions = s.fileSuggestions[:fileScanMaxDisplay]
-	}
 }
 
 func shouldSkipDirectory(name string) bool {
-	if strings.HasPrefix(name, ".") && name != ".gen" && name != ".claude" {
+	if strings.HasPrefix(name, ".") && name != ".gen" {
 		return true
 	}
 
 	switch name {
-	case "node_modules", "vendor", ".git", "__pycache__", "dist", "build":
+	case "node_modules", "vendor", ".git", "__pycache__", "dist", "build",
+		"target", "DerivedData", "Pods", "coverage":
 		return true
 	}
 	return false
 }
 
 func (s *State) SetCwd(cwd string) {
-	s.cwd = cwd
+	if s.cwd != cwd {
+		s.cwd = cwd
+		s.allFiles = nil
+		s.allFilesCwd = ""
+	}
 }
 
 func (s *State) MoveUp() {
 	if s.selectedIdx > 0 {
 		s.selectedIdx--
+		s.clampViewStart()
 	}
 }
 
 func (s *State) MoveDown() {
-	maxIdx := len(s.suggestions) - 1
-	if s.suggestionType == TypeFile {
-		maxIdx = len(s.fileSuggestions) - 1
-	}
+	maxIdx := s.maxSelectedIdx()
 	if s.selectedIdx < maxIdx {
 		s.selectedIdx++
+		s.clampViewStart()
+	}
+}
+
+func (s *State) MovePageUp() {
+	s.selectedIdx = max(s.selectedIdx-fileSuggestionViewSize, 0)
+	s.clampViewStart()
+}
+
+func (s *State) MovePageDown() {
+	maxIdx := s.maxSelectedIdx()
+	s.selectedIdx += fileSuggestionViewSize
+	if s.selectedIdx > maxIdx {
+		s.selectedIdx = maxIdx
+	}
+	if s.selectedIdx < 0 {
+		s.selectedIdx = 0
+	}
+	s.clampViewStart()
+}
+
+func (s *State) MoveToTop() {
+	s.selectedIdx = 0
+	s.viewStart = 0
+}
+
+func (s *State) MoveToEnd() {
+	s.selectedIdx = max(s.maxSelectedIdx(), 0)
+	s.clampViewStart()
+}
+
+func (s *State) maxSelectedIdx() int {
+	if s.suggestionType == TypeFile {
+		return len(s.fileSuggestions) - 1
+	}
+	return len(s.suggestions) - 1
+}
+
+func (s *State) clampViewStart() {
+	if s.suggestionType != TypeFile {
+		s.viewStart = 0
+		return
+	}
+	total := len(s.fileSuggestions)
+	if total == 0 {
+		s.viewStart = 0
+		return
+	}
+	maxStart := max(total-fileSuggestionViewSize, 0)
+	if s.viewStart > maxStart {
+		s.viewStart = maxStart
+	}
+	if s.viewStart < 0 {
+		s.viewStart = 0
+	}
+	if s.selectedIdx < s.viewStart {
+		s.viewStart = s.selectedIdx
+	} else if s.selectedIdx >= s.viewStart+fileSuggestionViewSize {
+		s.viewStart = s.selectedIdx - fileSuggestionViewSize + 1
 	}
 }
 
@@ -306,17 +395,28 @@ func (s *State) Render(width int) string {
 }
 
 func (s *State) renderfileSuggestions(width int) string {
-	const maxItems = 8
-	items := s.fileSuggestions
-	if len(items) > maxItems {
-		items = items[:maxItems]
+	total := len(s.fileSuggestions)
+	viewSize := min(fileSuggestionViewSize, total)
+
+	start := s.viewStart
+	if start+viewSize > total {
+		start = total - viewSize
 	}
+	if start < 0 {
+		start = 0
+	}
+	end := min(start+viewSize, total)
+	items := s.fileSuggestions[start:end]
 
 	boxWidth := clampInt(width*60/100, 40, 60)
 
 	var lines []string
 	headerStyle := lipgloss.NewStyle().Foreground(kit.CurrentTheme.Primary).Bold(true)
-	lines = append(lines, headerStyle.Render("@ Import file:"))
+	header := "@ Import file:"
+	if total > viewSize {
+		header = fmt.Sprintf("@ Import file (%d/%d):", s.selectedIdx+1, total)
+	}
+	lines = append(lines, headerStyle.Render(header))
 
 	maxPathLen := boxWidth - 10
 	for i, file := range items {
@@ -328,14 +428,18 @@ func (s *State) renderfileSuggestions(width int) string {
 		displayPath := truncateFromLeft(file.DisplayName, maxPathLen)
 		line := fmt.Sprintf("%s %s", icon, displayPath)
 
-		if i == s.selectedIdx {
+		if start+i == s.selectedIdx {
 			lines = append(lines, selectedSuggestionStyle().Render("> "+line))
 		} else {
 			lines = append(lines, normalSuggestionStyle().Render("  "+line))
 		}
 	}
 
-	lines = append(lines, "", commandDescStyle().Render("Tab/Enter to select · Esc to cancel"))
+	hint := "Tab/Enter to select · Esc to cancel"
+	if total > viewSize {
+		hint = "↑/↓ scroll · Tab/Enter · Esc"
+	}
+	lines = append(lines, "", commandDescStyle().Render(hint))
 
 	content := strings.Join(lines, "\n")
 	return suggestionBoxStyle().Width(boxWidth).Render(content)
