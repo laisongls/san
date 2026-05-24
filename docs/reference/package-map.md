@@ -75,6 +75,7 @@ Configuration and supporting capabilities:
 | `internal/secret` | `infrastructure` | Secret storage helpers. |
 | `internal/filecache` | `infrastructure` | File restore/cache helpers. |
 | `internal/markdown` | `infrastructure` | Markdown frontmatter parsing. |
+| `internal/proc` | `infrastructure` | Cross-platform process-group / signal helpers (Unix/Windows variants). |
 
 ## Ownership Rule
 

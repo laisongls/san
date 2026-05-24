@@ -59,6 +59,7 @@ var layerOf = map[string]string{
 	"internal/filecache": "infrastructure",
 	"internal/log":       "infrastructure",
 	"internal/markdown":  "infrastructure",
+	"internal/proc":      "infrastructure",
 	"internal/secret":    "infrastructure",
 }
 
