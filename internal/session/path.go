@@ -1,7 +1,6 @@
 package session
 
 import (
-	"path/filepath"
 	"runtime"
 	"strings"
 )
