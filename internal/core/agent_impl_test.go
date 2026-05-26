@@ -67,8 +67,8 @@ func TestCompactRecordsSummaryAppendAndBoundary(t *testing.T) {
 	if info == nil {
 		t.Fatal("compact did not emit OnCompact")
 	}
-	if info.BoundaryID != summaryAppend.ID {
-		t.Fatalf("boundary %q must equal summary ID %q", info.BoundaryID, summaryAppend.ID)
+	if info.SummaryMessageID != summaryAppend.ID {
+		t.Fatalf("SummaryMessageID %q must equal the appended summary ID %q", info.SummaryMessageID, summaryAppend.ID)
 	}
 
 	msgs := a.snapshot()

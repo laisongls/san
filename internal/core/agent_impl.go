@@ -506,7 +506,7 @@ func (a *agent) compact(ctx context.Context) bool {
 	summaryMsg.ID = NewMessageID()
 	a.SetMessages([]Message{summaryMsg})
 	a.emitAppend(summaryMsg)
-	a.emit(ctx, CompactEvent(a.id, CompactInfo{Summary: summary, OriginalCount: originalCount, BoundaryID: summaryMsg.ID}))
+	a.emit(ctx, CompactEvent(a.id, CompactInfo{Summary: summary, OriginalCount: originalCount, SummaryMessageID: summaryMsg.ID}))
 	return true
 }
 

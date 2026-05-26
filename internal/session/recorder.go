@@ -163,13 +163,14 @@ func (r *Recorder) OnAgentEvent(ev core.Event) {
 // stops walking parents, so the summarized-away history is not resurrected.
 func (r *Recorder) onCompact(ev core.Event) {
 	info, ok := ev.CompactInfo()
-	if !ok || info.BoundaryID == "" {
+	if !ok || info.SummaryMessageID == "" {
 		return
 	}
+	// The summary message's ID becomes the transcript compaction boundary.
 	err := r.fs.Compact(context.Background(), transcript.CompactCommand{
 		SessionID:  r.sessionID,
 		Time:       time.Now(),
-		BoundaryID: info.BoundaryID,
+		BoundaryID: info.SummaryMessageID,
 	})
 	if err != nil {
 		log.Logger().Warn("recorder: compact boundary failed", zap.Error(err))
