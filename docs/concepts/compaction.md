@@ -126,7 +126,8 @@ replay knows where the active chain begins.
 
 The core agent gives the summary a stable ID, records it as a normal
 `message.appended` (parented to the last pre-compaction message), and emits a
-`session.compacted` record whose `boundaryId` is that summary's ID:
+`session.compacted` record whose `summaryMessageId` is that summary's ID. Replay
+uses that ID as the boundary to stop walking parents at:
 
 ```
 transcript (append-only)            replay: walk leaf → parent, STOP at boundary
@@ -136,7 +137,7 @@ transcript (append-only)            replay: walk leaf → parent, STOP at bounda
   appended  SUM   ◀── boundary        SUM  ◀── stop ┐
   appended  m8  (parent = SUM)        m8            ├─ active chain = [SUM, m8, m9]
   appended  m9                        m9  (leaf)    ┘
-  session.compacted  boundaryId=SUM
+  session.compacted  summaryMessageId=SUM
 ```
 
 Without the boundary, replay would walk all the way back through `m1…m2…` and

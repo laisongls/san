@@ -284,7 +284,7 @@ function ingestForChain(rec) {
     return;
   }
   if (rec.type === "session.compacted") {
-    state.compactBoundary = (rec.session && rec.session.boundaryId) || "";
+    state.compactBoundary = (rec.session && rec.session.summaryMessageId) || "";
     state.activeChain = computeActiveChain(state.messageParents, state.compactBoundary);
     state.activeLeaf = lastChainLeaf(state.activeChain);
     rehighlightMessageRows();

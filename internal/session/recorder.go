@@ -166,11 +166,10 @@ func (r *Recorder) onCompact(ev core.Event) {
 	if !ok || info.SummaryMessageID == "" {
 		return
 	}
-	// The summary message's ID becomes the transcript compaction boundary.
 	err := r.fs.Compact(context.Background(), transcript.CompactCommand{
-		SessionID:  r.sessionID,
-		Time:       time.Now(),
-		BoundaryID: info.SummaryMessageID,
+		SessionID:        r.sessionID,
+		Time:             time.Now(),
+		SummaryMessageID: info.SummaryMessageID,
 	})
 	if err != nil {
 		log.Logger().Warn("recorder: compact boundary failed", zap.Error(err))

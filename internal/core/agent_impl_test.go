@@ -9,7 +9,7 @@ import (
 
 // Compaction must record the synthetic summary as a normal message.appended
 // (so replay can resolve the ID the next inference references) and emit a
-// CompactEvent whose BoundaryID equals that summary's ID (so replay truncates
+// CompactEvent whose SummaryMessageID equals that summary's ID (so replay truncates
 // the summarized-away history at the summary).
 func TestCompactRecordsSummaryAppendAndBoundary(t *testing.T) {
 	var captured []Event

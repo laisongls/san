@@ -208,7 +208,7 @@ func TestRecorderWritesToolsChangeEvents(t *testing.T) {
 }
 
 // Compaction must persist the summary as a message.appended and a
-// session.compacted boundary whose BoundaryID is that summary's ID, so replay
+// session.compacted record whose SummaryMessageID is that summary's ID, so replay
 // reconstructs the compacted chain instead of the summarized-away history.
 func TestRecorderWritesCompactionBoundary(t *testing.T) {
 	dir := t.TempDir()
@@ -240,7 +240,7 @@ func TestRecorderWritesCompactionBoundary(t *testing.T) {
 			summaryAppended = true
 		}
 		if r.Type == transcript.SessionCompacted && r.Session != nil {
-			boundary = r.Session.BoundaryID
+			boundary = r.Session.SummaryMessageID
 		}
 	}
 	if !summaryAppended {
