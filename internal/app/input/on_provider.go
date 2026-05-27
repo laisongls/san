@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -48,6 +49,13 @@ type ProviderStatusExpiredMsg = kit.StatusExpiredMsg
 // UpdateProvider routes provider connection and selection messages.
 func UpdateProvider(deps OverlayDeps, state *ProviderState, msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
+	case ProviderSpinnerTickMsg:
+		// Keep ticking while work is in flight; stop once it completes.
+		if state.Selector.IsBusy() {
+			state.Selector.AdvanceSpinner()
+			return providerSpinnerTickCmd(), true
+		}
+		return nil, true
 	case ProviderConnectResultMsg:
 		return state.Selector.HandleConnectResult(msg), true
 	case ProviderModelSelectedMsg:
@@ -202,6 +210,42 @@ type ProviderSelector struct {
 	lastConnectResult  string
 	lastConnectAuthIdx int // item index that triggered the connection
 	lastConnectSuccess bool
+
+	// spinnerTick advances on each ProviderSpinnerTickMsg; used to pick a braille
+	// frame while a connect/refresh is in flight.
+	spinnerTick int
+}
+
+// providerSpinnerInterval is the spin cadence while a connect/refresh runs —
+// fast enough to read as a smooth spinner (independent of the slower global
+// thinking-spinner tick).
+const providerSpinnerInterval = 90 * time.Millisecond
+
+// ProviderSpinnerTickMsg drives the in-flight braille spinner animation.
+type ProviderSpinnerTickMsg struct{}
+
+// providerSpinnerTickCmd schedules the next spinner frame.
+func providerSpinnerTickCmd() tea.Cmd {
+	return tea.Tick(providerSpinnerInterval, func(time.Time) tea.Msg {
+		return ProviderSpinnerTickMsg{}
+	})
+}
+
+// AdvanceSpinner moves the in-flight spinner to its next frame.
+func (s *ProviderSelector) AdvanceSpinner() { s.spinnerTick++ }
+
+// Transient in-flight result markers. While lastConnectResult equals one of
+// these, the row shows an animated spinner instead of static text.
+const (
+	providerStatusRefreshing = "Refreshing..."
+	providerStatusConnecting = "Connecting..."
+)
+
+// IsBusy reports whether a connect/refresh is in flight, so the shared spinner
+// keeps ticking and the row renders an animated frame.
+func (s *ProviderSelector) IsBusy() bool {
+	return s.active &&
+		(s.lastConnectResult == providerStatusRefreshing || s.lastConnectResult == providerStatusConnecting)
 }
 
 // providerStatusDisplayInfo contains display information for a provider status.
@@ -955,11 +999,11 @@ func (s *ProviderSelector) clampSelection() {
 
 // refreshAuthMethod re-fetches models for an already connected provider auth method.
 func (s *ProviderSelector) refreshAuthMethod(item providerAuthMethodItem, authIdx int) tea.Cmd {
-	s.lastConnectResult = "Refreshing..."
+	s.lastConnectResult = providerStatusRefreshing
 	s.lastConnectAuthIdx = authIdx
 	s.lastConnectSuccess = false
 
-	return func() tea.Msg {
+	work := func() tea.Msg {
 		ctx := context.Background()
 
 		llmProvider, err := llm.GetProvider(ctx, item.Provider, item.AuthMethod)
@@ -998,19 +1042,21 @@ func (s *ProviderSelector) refreshAuthMethod(item providerAuthMethodItem, authId
 		return ProviderConnectResultMsg{
 			AuthIdx:   authIdx,
 			Success:   true,
-			Message:   fmt.Sprintf("✓ Refreshed: %d models", len(models)),
+			Message:   fmt.Sprintf("● %d models", len(models)),
 			NewStatus: llm.StatusConnected,
 		}
 	}
+	// Start the spinner alongside the async work.
+	return tea.Batch(providerSpinnerTickCmd(), work)
 }
 
 // connectAuthMethod initiates an async connection to a provider auth method.
 func (s *ProviderSelector) connectAuthMethod(item providerAuthMethodItem, authIdx int) tea.Cmd {
-	s.lastConnectResult = "Connecting..."
+	s.lastConnectResult = providerStatusConnecting
 	s.lastConnectAuthIdx = authIdx
 	s.lastConnectSuccess = false
 
-	return func() tea.Msg {
+	work := func() tea.Msg {
 		ctx := context.Background()
 		result, err := s.ConnectProvider(ctx, item.Provider, item.AuthMethod)
 		if err != nil {
@@ -1028,6 +1074,7 @@ func (s *ProviderSelector) connectAuthMethod(item providerAuthMethodItem, authId
 			NewStatus: llm.StatusConnected,
 		}
 	}
+	return tea.Batch(providerSpinnerTickCmd(), work)
 }
 
 // HandleConnectResult updates the selector state with connection result.

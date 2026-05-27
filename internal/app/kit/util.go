@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/genai-io/gen-code/internal/secret"
 )
 
@@ -73,14 +75,18 @@ func RenderSelectableRow(line string, isSelected bool) string {
 	return SelectorItemStyle().Render("  " + line)
 }
 
-// FormatAlignedRow formats "icon  name<padding>info" with name padded to colWidth.
+// alignedRowMinGap is the minimum spacing kept between the name and info
+// columns, so names longer than colWidth never collide with the info column.
+const alignedRowMinGap = 2
+
+// FormatAlignedRow formats "icon  name<padding>info" with name padded to
+// colWidth and always separated from info by at least alignedRowMinGap spaces.
 func FormatAlignedRow(icon, name string, colWidth int, info string) string {
-	nameWidth := len(name) // approximate; callers can use lipgloss.Width for ANSI-safe width
-	pad := ""
-	if nameWidth < colWidth {
-		pad = strings.Repeat(" ", colWidth-nameWidth)
+	gap := colWidth - lipgloss.Width(name) // display width, ANSI/Unicode safe
+	if gap < alignedRowMinGap {
+		gap = alignedRowMinGap
 	}
-	return fmt.Sprintf("%s  %s%s%s", icon, name, pad, info)
+	return fmt.Sprintf("%s  %s%s%s", icon, name, strings.Repeat(" ", gap), info)
 }
 
 // MapString extracts a string value from a generic map.
@@ -128,8 +134,11 @@ func RenderEnvVarStatus(envVar string) string {
 	if envVar == "" {
 		return ""
 	}
+	// The env-var name is secondary reference info (kept dim); the check mark
+	// carries the signal — green ✓ when configured, dim ✗ when not.
+	name := DimStyle().Render(envVar)
 	if secret.Resolve(envVar) != "" {
-		return SelectorStatusReady().Render(envVar + " ✓")
+		return name + " " + SelectorStatusConnected().Render("✓")
 	}
-	return SelectorStatusNone().Render(envVar + " ✗")
+	return name + " " + SelectorStatusNone().Render("✗")
 }

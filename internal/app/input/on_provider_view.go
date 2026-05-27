@@ -276,7 +276,10 @@ func (s *ProviderSelector) renderModelRow(item providerListItem, isSelected bool
 // ── Providers tab rows ──────────────────────────────────────────────────────
 
 // providerNameColumnWidth is the fixed width for provider name alignment.
-const providerNameColumnWidth = 16
+// Sized to fit the longest display name ("Z.ai (GLM series)", 17 cols) plus a
+// comfortable gap, so every row's API-key column lines up without crowding —
+// even the longest name keeps ~5 cols of breathing room before its key.
+const providerNameColumnWidth = 22
 
 func (s *ProviderSelector) renderProviderRow(item providerListItem, isSelected bool, itemIdx int) string {
 	p := item.Provider
@@ -293,15 +296,10 @@ func (s *ProviderSelector) renderProviderRow(item providerListItem, isSelected b
 	} else if len(p.AuthMethods) > 1 {
 		envInfo = kit.DimStyle().Render(fmt.Sprintf("%d auth methods", len(p.AuthMethods)))
 	}
+	envInfo = s.appendConnectResult(envInfo, itemIdx)
 
 	line := kit.FormatAlignedRow(statusStyle.Render(statusIcon), p.DisplayName, providerNameColumnWidth, envInfo)
-	result := kit.RenderSelectableRow(line, isSelected)
-
-	if s.lastConnectResult != "" && itemIdx == s.lastConnectAuthIdx {
-		result += "\n" + providerResultIndent + s.renderConnectResult()
-	}
-
-	return result
+	return kit.RenderSelectableRow(line, isSelected)
 }
 
 func (s *ProviderSelector) renderAuthMethod(item providerListItem, isSelected bool, itemIdx int) string {
@@ -319,16 +317,11 @@ func (s *ProviderSelector) renderAuthMethod(item providerListItem, isSelected bo
 	if statusDesc != "" && envInfo == "" {
 		envInfo = kit.DimStyle().Render(statusDesc)
 	}
+	envInfo = s.appendConnectResult(envInfo, itemIdx)
 
 	colWidth := providerNameColumnWidth - 2 // sub-item indent
 	line := "  " + kit.FormatAlignedRow(statusStyle.Render(statusIcon), am.DisplayName, colWidth, envInfo)
-	result := kit.RenderSelectableRow(line, isSelected)
-
-	if s.lastConnectResult != "" && itemIdx == s.lastConnectAuthIdx {
-		result += "\n" + providerResultIndent + "  " + s.renderConnectResult()
-	}
-
-	return result
+	return kit.RenderSelectableRow(line, isSelected)
 }
 
 // ── API key input ───────────────────────────────────────────────────────────
@@ -366,13 +359,23 @@ func (s *ProviderSelector) renderHints() string {
 
 // ── Connection result ───────────────────────────────────────────────────────
 
-// providerResultIndent is the fixed indent for connection result messages,
-// aligned with the provider name column.
-const providerResultIndent = "        "
+// appendConnectResult appends the inline connect/refresh result (e.g.
+// "Refreshed · 2 models") to a row's info column when it belongs to itemIdx,
+// separated from the env-var status by a gap.
+func (s *ProviderSelector) appendConnectResult(envInfo string, itemIdx int) string {
+	if s.lastConnectResult == "" || itemIdx != s.lastConnectAuthIdx {
+		return envInfo
+	}
+	result := s.renderConnectResult()
+	if envInfo == "" {
+		return result
+	}
+	return envInfo + "   " + result
+}
 
 func (s *ProviderSelector) connectResultStyle() lipgloss.Style {
 	if !s.lastConnectSuccess {
-		if s.lastConnectResult == "Connecting..." || s.lastConnectResult == "Refreshing..." {
+		if s.IsBusy() {
 			return kit.DimStyle()
 		}
 		return lipgloss.NewStyle().Foreground(kit.CurrentTheme.Error)
@@ -380,9 +383,20 @@ func (s *ProviderSelector) connectResultStyle() lipgloss.Style {
 	if strings.HasPrefix(s.lastConnectResult, "⚠") {
 		return lipgloss.NewStyle().Foreground(kit.CurrentTheme.Warning)
 	}
-	return kit.SelectorStatusConnected()
+	// Plain success (e.g. "· 2 models") is supplementary info — the green status
+	// dot and key ✓ already signal success, so keep it dim to avoid competing.
+	return kit.DimStyle()
 }
 
+// providerSpinnerFrames is the braille spinner shown while a connect/refresh
+// is in flight, advanced by the shared animation tick.
+var providerSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
 func (s *ProviderSelector) renderConnectResult() string {
+	// While in flight, show just the animated braille spinner (no text).
+	if s.IsBusy() {
+		frame := providerSpinnerFrames[s.spinnerTick%len(providerSpinnerFrames)]
+		return kit.DimStyle().Render(frame)
+	}
 	return s.connectResultStyle().Render(s.lastConnectResult)
 }

@@ -12,6 +12,27 @@ import (
 	"github.com/genai-io/gen-code/internal/llm"
 )
 
+// connectResultFromCmd runs cmd (flattening a tea.Batch) and returns the first
+// ProviderConnectResultMsg it produces. connect/refresh commands batch the
+// spinner ticker alongside the async work, so the result is no longer the
+// top-level message.
+func connectResultFromCmd(cmd tea.Cmd) (ProviderConnectResultMsg, bool) {
+	if cmd == nil {
+		return ProviderConnectResultMsg{}, false
+	}
+	switch msg := cmd().(type) {
+	case ProviderConnectResultMsg:
+		return msg, true
+	case tea.BatchMsg:
+		for _, c := range msg {
+			if r, ok := connectResultFromCmd(c); ok {
+				return r, true
+			}
+		}
+	}
+	return ProviderConnectResultMsg{}, false
+}
+
 type connectFailProvider struct{}
 
 func (p *connectFailProvider) Stream(context.Context, llm.CompletionOptions) <-chan llm.StreamChunk {
@@ -321,9 +342,9 @@ func TestConnectAuthMethodFailsWhenModelsCannotBeLoaded(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected connectAuthMethod command")
 	}
-	msg, ok := cmd().(ProviderConnectResultMsg)
+	msg, ok := connectResultFromCmd(cmd)
 	if !ok {
-		t.Fatalf("unexpected message type %T", cmd())
+		t.Fatalf("expected a ProviderConnectResultMsg from connectAuthMethod")
 	}
 	if msg.Success {
 		t.Fatalf("expected failed connect result, got %+v", msg)
