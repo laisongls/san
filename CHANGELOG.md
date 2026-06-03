@@ -3,6 +3,13 @@
 All notable changes to Gen Code are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [v1.19.3] - 2026-06-03
+
+### Added
+- Scroll command suggestions in TUI ([@hchenxa](https://github.com/hchenxa))
+- Quit/exit commands (#83) ([@hchenxa](https://github.com/hchenxa))
+- OWNERS file ([@hchenxa](https://github.com/hchenxa))
+
 ## [v1.19.2] - 2026-06-02
 
 ### Added
